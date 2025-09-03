@@ -5,17 +5,17 @@ use crate::{
 };
 
 #[derive(Default)]
-pub struct Group<'a> {
-    pub objects: Vec<&'a dyn Object>,
+pub struct Group {
+    pub objects: Vec<Box<dyn Object>>,
 }
 
-impl<'a> Group<'a> {
-    pub fn add(&mut self, object: &'a dyn Object) {
+impl Group {
+    pub fn add(&mut self, object: Box<dyn Object>) {
         self.objects.push(object);
     }
 }
 
-impl<'a> Object for Group<'a> {
+impl Object for Group {
     fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit<'_>> {
         let mut rec: Option<Hit> = None;
         let mut closest = ray_t.max;

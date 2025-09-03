@@ -10,11 +10,11 @@ pub struct Hit<'a> {
     pub p: Point3,
     pub normal: Vec3,
     pub front_face: bool,
-    pub mat: &'a dyn Material,
+    pub mat: &'a Box<dyn Material>,
 }
 
 impl<'a> Hit<'a> {
-    pub fn new(t: f64, p: Vec3, r: &Ray, outward_normal: Vec3, mat: &'a dyn Material) -> Self {
+    pub fn new(t: f64, p: Vec3, r: &Ray, outward_normal: Vec3, mat: &'a Box<dyn Material>) -> Self {
         let front_face = r.direction.dot(&outward_normal) < 0.0;
         Self {
             t,

@@ -6,19 +6,13 @@ use crate::{
     ray::Ray,
 };
 
-pub struct Sphere<M>
-where
-    M: Material,
-{
+pub struct Sphere {
     pub center: Vec3,
     pub radius: f64,
-    pub mat: M,
+    pub mat: Box<dyn Material>,
 }
 
-impl<M> Object for Sphere<M>
-where
-    M: Material,
-{
+impl Object for Sphere {
     fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit<'_>> {
         let oc = self.center - r.origin;
         let a = r.direction.length_squared();

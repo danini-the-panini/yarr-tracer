@@ -3,13 +3,13 @@ use crate::{
     ray::Ray, rgb,
 };
 
-pub struct Scene<'a> {
+pub struct Scene {
     pub camera: Camera,
-    pub world: Group<'a>,
+    pub world: Group,
 }
 
-impl<'a> Scene<'a> {
-    pub fn new(camera: Camera, world: Group<'a>) -> Self {
+impl Scene {
+    pub fn new(camera: Camera, world: Group) -> Self {
         Self { camera, world }
     }
 
