@@ -1,11 +1,11 @@
-use std::sync::Arc;
-
+use camera::Camera;
 use group::Group;
 use math::Vec3;
 use scene::Scene;
 use sphere::Sphere;
 use thread_pool::{render_threaded, render_unthreaded};
 
+mod camera;
 mod color;
 mod group;
 mod interval;
@@ -33,7 +33,9 @@ fn main() {
     world.add(&sphere);
     world.add(&ground);
 
-    let scene = Scene::new(400, 225, world);
+    let camera = Camera::new(400, 225);
+
+    let scene = Scene::new(camera, world);
 
     let cpus = num_cpus::get();
 

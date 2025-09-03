@@ -1,59 +1,46 @@
-use std::sync::Arc;
-
 use crate::{
-    group::Group,
-    math::{Point3, Vec3},
-    point, vec3,
+    camera::Camera, color::Color, group::Group, interval::Interval, object::Object, ray::Ray, rgb,
 };
 
 pub struct Scene<'a> {
-    pub image_width: usize,
-    pub image_height: usize,
-    pub aspect_ratio: f64,
-    pub viewport_width: f64,
-    pub viewport_height: f64,
-    pub camera_center: Point3,
-    pub pixel_delta_u: Vec3,
-    pub pixel_delta_v: Vec3,
-    pub pixel00_loc: Point3,
+    pub camera: Camera,
     pub world: Group<'a>,
 }
 
 impl<'a> Scene<'a> {
-    pub fn new(image_width: usize, image_height: usize, world: Group<'a>) -> Self {
-        let aspect_ratio = (image_width as f64) / (image_height as f64);
+    pub fn new(camera: Camera, world: Group<'a>) -> Self {
+        Self { camera, world }
+    }
 
-        // Camera
+    pub fn render(&self, i: usize, j: usize) -> (u8, u8, u8) {
+        let pixel_center = self.camera.pixel00_loc
+            + ((i as f64) * self.camera.pixel_delta_u)
+            + ((j as f64) * self.camera.pixel_delta_v);
+        let ray_direction = pixel_center - self.camera.center;
+        let r = Ray::new(self.camera.center, ray_direction, 0.0);
+        let pixel_color = self.ray_color(&r);
 
-        let focal_length = 1.0;
-        let viewport_height = 2.0;
-        let viewport_width = viewport_height * aspect_ratio;
-        let camera_center = point!(0.0, 0.0, 0.0);
+        pixel_color.to_pixel()
+    }
 
-        // Calculate the vectors across the horizontal and down the vertical viewport edges.
-        let viewport_u = vec3!(viewport_width, 0.0, 0.0);
-        let viewport_v = vec3!(0.0, -viewport_height, 0.0);
-
-        // Calculate the horizontal and vertical delta vectors from pixel to pixel.
-        let pixel_delta_u = viewport_u / (image_width as f64);
-        let pixel_delta_v = viewport_v / (image_height as f64);
-
-        // Calculate the location of the upper left pixel.
-        let viewport_upper_left =
-            camera_center - vec3!(0.0, 0.0, focal_length) - viewport_u / 2.0 - viewport_v / 2.0;
-        let pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
-
-        Self {
-            image_width,
-            image_height,
-            aspect_ratio,
-            viewport_width,
-            viewport_height,
-            camera_center,
-            pixel_delta_u,
-            pixel_delta_v,
-            pixel00_loc,
-            world,
+    fn ray_color(&self, r: &Ray) -> Color {
+        if let Some(hit) = self.world.hit(r, &Interval::from(0.0)) {
+            return 0.5 * (hit.normal + rgb!(1.0, 1.0, 1.0));
         }
+
+        let unit_direction = r.direction.unit();
+        let a = 0.5 * (unit_direction.y() + 1.0);
+        (1.0 - a) * rgb!(1.0, 1.0, 1.0) + a * rgb!(0.5, 0.7, 1.0)
+    }
+
+    pub fn write_image_header(&self) {
+        println!(
+            "P3\n{} {}\n255",
+            self.camera.image_width, self.camera.image_height
+        );
+    }
+
+    pub fn write_pixel(&self, color: (u8, u8, u8)) {
+        println!("{} {} {}", color.0, color.1, color.2);
     }
 }
