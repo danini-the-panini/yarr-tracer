@@ -31,7 +31,7 @@ struct ThreadPool {
 }
 
 impl ThreadPool {
-    fn new(size: usize, scene: Scene) -> Self {
+    fn new(size: usize, scene: &Arc<Scene>) -> Self {
         let (tx, rx) = mpsc::channel();
         let (result_tx, result_rx) = mpsc::channel();
         let rx = Arc::new(Mutex::new(rx));
@@ -40,6 +40,7 @@ impl ThreadPool {
         let mut handles = vec![];
 
         for _ in 0..size {
+            let scene = Arc::clone(&scene);
             let rx = Arc::clone(&rx);
             let result_tx = Arc::clone(&result_tx);
             let handle = thread::spawn(move || {
@@ -74,13 +75,13 @@ impl ThreadPool {
 }
 
 fn main() {
-    let scene = Scene {
+    let scene = Arc::new(Scene {
         image_width: 256,
         image_height: 256,
-    };
+    });
 
     let cpus = num_cpus::get();
-    let pool = ThreadPool::new(cpus, scene);
+    let pool = ThreadPool::new(cpus, &scene);
 
     let mut image: Vec<(u8, u8, u8)> = vec![(0, 0, 0); scene.image_width * scene.image_height];
 
