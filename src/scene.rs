@@ -13,14 +13,12 @@ impl<'a> Scene<'a> {
     }
 
     pub fn render(&self, i: usize, j: usize) -> (u8, u8, u8) {
-        let pixel_center = self.camera.pixel00_loc
-            + ((i as f64) * self.camera.pixel_delta_u)
-            + ((j as f64) * self.camera.pixel_delta_v);
-        let ray_direction = pixel_center - self.camera.center;
-        let r = Ray::new(self.camera.center, ray_direction, 0.0);
-        let pixel_color = self.ray_color(&r);
-
-        pixel_color.to_pixel()
+        let mut pixel_color = rgb!(0.0, 0.0, 0.0);
+        for _ in 0..self.camera.samples {
+            let r = self.camera.get_ray(i, j);
+            pixel_color += self.ray_color(&r);
+        }
+        (pixel_color * self.camera.samples_scale).to_pixel()
     }
 
     fn ray_color(&self, r: &Ray) -> Color {

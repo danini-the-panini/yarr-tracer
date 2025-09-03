@@ -33,7 +33,7 @@ fn main() {
     world.add(&sphere);
     world.add(&ground);
 
-    let camera = Camera::new(400, 225);
+    let camera = Camera::new(400, 225, 100);
 
     let scene = Scene::new(camera, world);
 

@@ -5,18 +5,10 @@ use std::{
 
 use crate::scene::Scene;
 
-#[derive(Debug, Copy, Clone)]
-pub struct Pixel {
-    pub p: (usize, usize),
-    pub color: (u8, u8, u8),
-}
-
-unsafe impl Send for Pixel {}
-unsafe impl Sync for Pixel {}
-
 pub fn render_threaded(size: usize, scene: &Scene) {
-    let (tx, rx) = mpsc::channel::<(usize, usize)>();
-    let (result_tx, result_rx) = mpsc::channel::<Pixel>();
+    eprintln!("RUNNING ON {} CPUS", size);
+    let (tx, rx) = mpsc::channel::<usize>();
+    let (result_tx, result_rx) = mpsc::channel::<(usize, Vec<(u8, u8, u8)>)>();
     let rx = Arc::new(Mutex::new(rx));
     let result_tx = Arc::new(Mutex::new(result_tx));
 
@@ -29,34 +21,43 @@ pub fn render_threaded(size: usize, scene: &Scene) {
         for _ in 0..size {
             let rx = Arc::clone(&rx);
             let result_tx = Arc::clone(&result_tx);
-            s.spawn(move || {
-                while let Ok((i, j)) = rx.lock().unwrap().recv() {
-                    let color = scene.render(i, j);
+            s.spawn(move || loop {
+                let msg = rx.lock().unwrap().recv();
 
-                    result_tx
-                        .lock()
-                        .unwrap()
-                        .send(Pixel { p: (i, j), color })
-                        .expect("Failed to send pixel");
+                match msg {
+                    Ok(j) => {
+                        let row: Vec<(u8, u8, u8)> = (0..scene.camera.image_width)
+                            .into_iter()
+                            .map(|i| scene.render(i, j))
+                            .collect();
+
+                        result_tx
+                            .lock()
+                            .unwrap()
+                            .send((j, row))
+                            .expect("Failed to send pixel");
+                    }
+                    Err(_) => {
+                        break;
+                    }
                 }
             });
         }
 
         for j in 0..scene.camera.image_height {
-            for i in 0..scene.camera.image_width {
-                tx.send((i, j)).expect("Failed to send pixel");
-            }
+            tx.send(j).expect("Failed to send pixel");
         }
 
         drop(tx);
 
-        for i in 0..(image.len()) {
+        for j in 0..scene.camera.image_height {
             eprint!(
                 "\rProgress: {}% ",
-                (((i as f64) / (image.len() as f64)) * 100.0) as u8
+                (((j as f64) / (scene.camera.image_height as f64)) * 100.0) as u8
             );
-            let pixel = result_rx.recv().expect("Failed to receive pixel");
-            image[pixel.p.0 + pixel.p.1 * scene.camera.image_width] = pixel.color;
+            let (j, row) = result_rx.recv().expect("Failed to receive pixel");
+            let row_start = j * scene.camera.image_width;
+            image[row_start..row_start + scene.camera.image_width].copy_from_slice(&row);
         }
 
         drop(result_rx);
