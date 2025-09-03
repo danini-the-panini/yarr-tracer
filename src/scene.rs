@@ -1,10 +1,12 @@
+use std::sync::Arc;
+
 use crate::{
+    group::Group,
     math::{Point3, Vec3},
     point, vec3,
 };
 
-#[derive(Debug, Copy, Clone)]
-pub struct Scene {
+pub struct Scene<'a> {
     pub image_width: usize,
     pub image_height: usize,
     pub aspect_ratio: f64,
@@ -14,9 +16,11 @@ pub struct Scene {
     pub pixel_delta_u: Vec3,
     pub pixel_delta_v: Vec3,
     pub pixel00_loc: Point3,
+    pub world: Group<'a>,
 }
-impl Scene {
-    pub fn new(image_width: usize, image_height: usize) -> Self {
+
+impl<'a> Scene<'a> {
+    pub fn new(image_width: usize, image_height: usize, world: Group<'a>) -> Self {
         let aspect_ratio = (image_width as f64) / (image_height as f64);
 
         // Camera
@@ -49,6 +53,7 @@ impl Scene {
             pixel_delta_u,
             pixel_delta_v,
             pixel00_loc,
+            world,
         }
     }
 }
