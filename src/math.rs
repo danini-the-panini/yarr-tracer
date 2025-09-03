@@ -310,7 +310,8 @@ impl Vec3 {
     pub fn random_in_unit_sphere() -> Self {
         loop {
             let p = Vec3::random_in_range(-1.0, 1.0);
-            if p.length_squared() < 1.0 {
+            let lensq = p.length_squared();
+            if 1e-160 < lensq && lensq < 1.0 {
                 break p;
             };
         }

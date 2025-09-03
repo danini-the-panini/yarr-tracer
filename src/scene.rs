@@ -1,5 +1,6 @@
 use crate::{
-    camera::Camera, color::Color, group::Group, interval::Interval, object::Object, ray::Ray, rgb,
+    camera::Camera, color::Color, group::Group, interval::Interval, math::Vec3, object::Object,
+    ray::Ray, rgb,
 };
 
 pub struct Scene<'a> {
@@ -16,14 +17,19 @@ impl<'a> Scene<'a> {
         let mut pixel_color = rgb!(0.0, 0.0, 0.0);
         for _ in 0..self.camera.samples {
             let r = self.camera.get_ray(i, j);
-            pixel_color += self.ray_color(&r);
+            pixel_color += self.ray_color(&r, self.camera.max_depth);
         }
         (pixel_color * self.camera.samples_scale).to_pixel()
     }
 
-    fn ray_color(&self, r: &Ray) -> Color {
-        if let Some(hit) = self.world.hit(r, &Interval::from(0.0)) {
-            return 0.5 * (hit.normal + rgb!(1.0, 1.0, 1.0));
+    fn ray_color(&self, r: &Ray, depth: u32) -> Color {
+        if depth == 0 {
+            return rgb!(0.0, 0.0, 0.0);
+        }
+
+        if let Some(hit) = self.world.hit(r, &Interval::from(0.001)) {
+            let direction = hit.normal + Vec3::random_unit();
+            return 0.5 * self.ray_color(&Ray::new(hit.p, direction, 0.0), depth - 1);
         }
 
         let unit_direction = r.direction.unit();

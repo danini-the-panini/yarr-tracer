@@ -11,6 +11,7 @@ pub struct Camera {
     pub aspect_ratio: f64,
     pub samples: u32,
     pub samples_scale: f64,
+    pub max_depth: u32,
     pub viewport_width: f64,
     pub viewport_height: f64,
     pub center: Point3,
@@ -20,7 +21,7 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(image_width: usize, image_height: usize, samples: u32) -> Self {
+    pub fn new(image_width: usize, image_height: usize, samples: u32, max_depth: u32) -> Self {
         let aspect_ratio = (image_width as f64) / (image_height as f64);
 
         // Camera
@@ -49,6 +50,7 @@ impl Camera {
             aspect_ratio,
             samples,
             samples_scale: 1.0 / (samples as f64),
+            max_depth,
             viewport_width,
             viewport_height,
             center,
