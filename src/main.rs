@@ -94,9 +94,20 @@ fn main() {
 
     drop(pool.tx);
 
+    for i in 0..(image.len()) {
+        eprint!(
+            "\rProgress: {}% ",
+            (((i as f64) / (image.len() as f64)) * 100.0) as u8
+        );
+        let pixel = pool.rx.recv().expect("Failed to receive pixel");
+        image[pixel.p.0 + pixel.p.1 * scene.image_width] = pixel.color;
+    }
+
     for handle in pool.handles {
         handle.join().unwrap();
     }
+
+    eprintln!("\rDone.                   ");
 
     for pixel in pool.rx {
         image[pixel.p.0 + pixel.p.1 * scene.image_width] = pixel.color;
