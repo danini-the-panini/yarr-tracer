@@ -5,10 +5,11 @@ use scene::Scene;
 use sphere::Sphere;
 use thread_pool::{render_threaded, render_unthreaded};
 
-use crate::{color::Color, lambertian::Lambertian, metal::Metal};
+use crate::{color::Color, dielectric::Dielectric, lambertian::Lambertian, metal::Metal};
 
 mod camera;
 mod color;
+mod dielectric;
 mod group;
 mod interval;
 mod lambertian;
@@ -43,9 +44,15 @@ fn main() {
     let sphere_left = Sphere {
         center: vec3!(-1.0, 0.0, -1.0),
         radius: 0.5,
-        mat: Metal {
-            albedo: rgb!(0.8, 0.8, 0.8),
-            fuzz: 0.3,
+        mat: Dielectric {
+            refraction_index: 1.50,
+        },
+    };
+    let sphere_bubble = Sphere {
+        center: vec3!(-1.0, 0.0, -1.0),
+        radius: 0.4,
+        mat: Dielectric {
+            refraction_index: 1.00 / 1.50,
         },
     };
     let sphere_right = Sphere {
@@ -60,6 +67,7 @@ fn main() {
     world.add(&ground);
     world.add(&sphere_center);
     world.add(&sphere_left);
+    world.add(&sphere_bubble);
     world.add(&sphere_right);
 
     let camera = Camera::new(400, 225, 100, 50);
