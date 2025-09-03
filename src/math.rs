@@ -224,6 +224,30 @@ impl<const N: usize> ops::Sub for Vector<N> {
     }
 }
 
+impl<const N: usize> ops::Sub for &Vector<N> {
+    type Output = Vector<N>;
+
+    fn sub(self, v: Self) -> Vector<N> {
+        let mut result = Vector::<N>::default();
+        for i in 0..N {
+            result.0[i] = self.0[i] - v.0[i]
+        }
+        result
+    }
+}
+
+impl<const N: usize> ops::Sub<Vector<N>> for &Vector<N> {
+    type Output = Vector<N>;
+
+    fn sub(self, v: Vector<N>) -> Vector<N> {
+        let mut result = Vector::<N>::default();
+        for i in 0..N {
+            result.0[i] = self.0[i] - v.0[i]
+        }
+        result
+    }
+}
+
 impl<const N: usize> ops::Mul<f64> for Vector<N> {
     type Output = Vector<N>;
 
