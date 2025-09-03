@@ -1,6 +1,6 @@
 use camera::Camera;
 use group::Group;
-use math::Vec3;
+use math::{Point3, Vec3};
 use scene::Scene;
 use sphere::Sphere;
 use thread_pool::{render_threaded, render_unthreaded};
@@ -70,7 +70,16 @@ fn main() {
     world.add(&sphere_bubble);
     world.add(&sphere_right);
 
-    let camera = Camera::new(400, 225, 100, 50);
+    let camera = Camera::new(
+        400,
+        225,
+        20.0,
+        point!(-2.0, 2.0, 1.0),
+        point!(0.0, 0.0, -1.0),
+        vec3!(0.0, 1.0, 0.0),
+        100,
+        50,
+    );
 
     let scene = Scene::new(camera, world);
 

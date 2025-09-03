@@ -19,7 +19,7 @@ impl<M> Object for Sphere<M>
 where
     M: Material,
 {
-    fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit> {
+    fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit<'_>> {
         let oc = self.center - r.origin;
         let a = r.direction.length_squared();
         let h = r.direction.dot(&oc);

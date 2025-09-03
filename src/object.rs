@@ -31,5 +31,5 @@ impl<'a> Hit<'a> {
 }
 
 pub trait Object: Send + Sync {
-    fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit>;
+    fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit<'_>>;
 }
