@@ -1,16 +1,24 @@
 use crate::{
     interval::Interval,
+    material::Material,
     math::Vec3,
     object::{Hit, Object},
     ray::Ray,
 };
 
-pub struct Sphere {
+pub struct Sphere<M>
+where
+    M: Material,
+{
     pub center: Vec3,
     pub radius: f64,
+    pub mat: M,
 }
 
-impl Object for Sphere {
+impl<M> Object for Sphere<M>
+where
+    M: Material,
+{
     fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit> {
         let oc = self.center - r.origin;
         let a = r.direction.length_squared();
@@ -35,6 +43,12 @@ impl Object for Sphere {
 
         let p = r.at(root);
 
-        Some(Hit::new(root, p, r, (p - self.center) / self.radius))
+        Some(Hit::new(
+            root,
+            p,
+            r,
+            (p - self.center) / self.radius,
+            &self.mat,
+        ))
     }
 }

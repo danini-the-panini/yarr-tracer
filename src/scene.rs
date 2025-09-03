@@ -28,8 +28,11 @@ impl<'a> Scene<'a> {
         }
 
         if let Some(hit) = self.world.hit(r, &Interval::from(0.001)) {
-            let direction = hit.normal + Vec3::random_unit();
-            return 0.5 * self.ray_color(&Ray::new(hit.p, direction, 0.0), depth - 1);
+            if let Some(scatter) = hit.mat.scatter(r, &hit) {
+                return scatter.att * self.ray_color(&scatter.ray, depth - 1);
+            } else {
+                return rgb!(0.0, 0.0, 0.0);
+            }
         }
 
         let unit_direction = r.direction.unit();

@@ -5,11 +5,16 @@ use scene::Scene;
 use sphere::Sphere;
 use thread_pool::{render_threaded, render_unthreaded};
 
+use crate::{color::Color, lambertian::Lambertian, metal::Metal};
+
 mod camera;
 mod color;
 mod group;
 mod interval;
+mod lambertian;
+mod material;
 mod math;
+mod metal;
 mod object;
 mod ray;
 mod scene;
@@ -21,17 +26,41 @@ mod util;
 fn main() {
     let mut world = Group::default();
 
-    let sphere = Sphere {
-        center: vec3!(0.0, 0.0, -1.0),
-        radius: 0.5,
-    };
     let ground = Sphere {
         center: vec3!(0.0, -100.5, -1.0),
         radius: 100.0,
+        mat: Lambertian {
+            albedo: rgb!(0.8, 0.8, 0.0),
+        },
+    };
+    let sphere_center = Sphere {
+        center: vec3!(0.0, 0.0, -1.2),
+        radius: 0.5,
+        mat: Lambertian {
+            albedo: rgb!(0.1, 0.2, 0.5),
+        },
+    };
+    let sphere_left = Sphere {
+        center: vec3!(-1.0, 0.0, -1.0),
+        radius: 0.5,
+        mat: Metal {
+            albedo: rgb!(0.8, 0.8, 0.8),
+            fuzz: 0.3,
+        },
+    };
+    let sphere_right = Sphere {
+        center: vec3!(1.0, 0.0, -1.0),
+        radius: 0.5,
+        mat: Metal {
+            albedo: rgb!(0.8, 0.6, 0.2),
+            fuzz: 1.0,
+        },
     };
 
-    world.add(&sphere);
     world.add(&ground);
+    world.add(&sphere_center);
+    world.add(&sphere_left);
+    world.add(&sphere_right);
 
     let camera = Camera::new(400, 225, 100, 50);
 

@@ -1,18 +1,20 @@
 use crate::{
     interval::Interval,
+    material::Material,
     math::{Point3, Vec3},
     ray::Ray,
 };
 
-pub struct Hit {
+pub struct Hit<'a> {
     pub t: f64,
     pub p: Point3,
     pub normal: Vec3,
     pub front_face: bool,
+    pub mat: &'a dyn Material,
 }
 
-impl Hit {
-    pub fn new(t: f64, p: Vec3, r: &Ray, outward_normal: Vec3) -> Self {
+impl<'a> Hit<'a> {
+    pub fn new(t: f64, p: Vec3, r: &Ray, outward_normal: Vec3, mat: &'a dyn Material) -> Self {
         let front_face = r.direction.dot(&outward_normal) < 0.0;
         Self {
             t,
@@ -23,6 +25,7 @@ impl Hit {
                 -outward_normal
             },
             front_face,
+            mat,
         }
     }
 }
