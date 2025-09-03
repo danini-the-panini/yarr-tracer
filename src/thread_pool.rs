@@ -6,7 +6,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::{color::Color, rgb, scene::Scene};
+use crate::{color::Color, ray::Ray, rgb, scene::Scene};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Pixel {
@@ -23,12 +23,18 @@ pub struct ThreadPool {
     pub handles: Vec<JoinHandle<()>>,
 }
 
+fn ray_color(r: &Ray) -> Color {
+    let unit_direction = r.direction.unit();
+    let a = 0.5 * (unit_direction.y() + 1.0);
+    return (1.0 - a) * rgb!(1.0, 1.0, 1.0) + a * rgb!(0.5, 0.7, 1.0);
+}
+
 fn render(i: usize, j: usize, scene: &Arc<Scene>) -> (u8, u8, u8) {
-    let pixel_color = rgb!(
-        (i as f64) / ((scene.image_width - 1) as f64),
-        (j as f64) / ((scene.image_height - 1) as f64),
-        0.0
-    );
+    let pixel_center =
+        scene.pixel00_loc + ((i as f64) * scene.pixel_delta_u) + ((j as f64) * scene.pixel_delta_v);
+    let ray_direction = pixel_center - scene.camera_center;
+    let r = Ray::new(scene.camera_center, ray_direction, 0.0);
+    let pixel_color = ray_color(&r);
 
     pixel_color.to_pixel()
 }

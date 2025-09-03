@@ -6,16 +6,14 @@ use thread_pool::ThreadPool;
 mod color;
 mod interval;
 mod math;
+mod ray;
 mod scene;
 mod test_data;
 mod thread_pool;
 mod util;
 
 fn main() {
-    let scene = Arc::new(Scene {
-        image_width: 256,
-        image_height: 256,
-    });
+    let scene = Arc::new(Scene::new(400, 225));
 
     let cpus = num_cpus::get();
     let pool = ThreadPool::new(cpus, &scene);
