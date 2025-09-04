@@ -1,15 +1,15 @@
+use std::{env, fs};
+
 use camera::Camera;
 use group::Group;
-use math::{Point3, Vec3};
-use rand::random;
+use kdl::{KdlDocument, KdlNode};
+use material::Material;
+use math::Vec3;
 use scene::Scene;
 use sphere::Sphere;
 use thread_pool::{render_threaded, render_unthreaded};
 
-use crate::{
-    color::Color, dielectric::Dielectric, lambertian::Lambertian, metal::Metal,
-    util::random_in_range,
-};
+use crate::{dielectric::Dielectric, lambertian::Lambertian, metal::Metal};
 
 mod camera;
 mod color;
@@ -28,98 +28,111 @@ mod test_data;
 mod thread_pool;
 mod util;
 
-fn main() {
-    let mut world = Group::default();
+#[derive(Debug)]
+pub struct Error(String);
 
-    let ground = Sphere {
-        center: vec3!(0.0, -1000.0, 0.0),
-        radius: 1000.0,
-        mat: Box::new(Lambertian {
-            albedo: rgb!(0.5, 0.5, 0.5),
+impl<E> From<E> for Error
+where
+    E: ToString,
+{
+    fn from(value: E) -> Self {
+        Self(value.to_string())
+    }
+}
+
+fn get_vec(node: &KdlNode, key: &str) -> Vec3 {
+    let values: Vec<f64> = node
+        .children()
+        .unwrap()
+        .iter_args(key)
+        .map(|v| v.as_float().unwrap())
+        .collect();
+    Vec3::new(values[0], values[1], values[2])
+}
+
+fn get_float(node: &KdlNode, key: &str) -> f64 {
+    node.children()
+        .unwrap()
+        .get_arg(key)
+        .unwrap()
+        .as_float()
+        .unwrap()
+}
+fn get_int(node: &KdlNode, key: &str) -> i128 {
+    node.children()
+        .unwrap()
+        .get_arg(key)
+        .unwrap()
+        .as_integer()
+        .unwrap()
+}
+
+fn get_camera(kdl: &KdlDocument) -> Camera {
+    let camera = kdl.get("Camera").unwrap();
+    Camera::new(
+        get_int(&camera, "image_width") as usize,
+        get_int(&camera, "image_height") as usize,
+        get_float(&camera, "vfov"),
+        get_vec(&camera, "lookfrom"),
+        get_vec(&camera, "lookat"),
+        get_vec(&camera, "vup"),
+        get_float(&camera, "defocus_angle"),
+        get_float(&camera, "focus_dist"),
+        get_int(&camera, "samples") as u32,
+        get_int(&camera, "max_depth") as u32,
+    )
+}
+
+fn parse_mat(node: &KdlNode) -> Box<dyn Material> {
+    match node.get(0).unwrap().as_string().unwrap() {
+        "Lambertian" => Box::new(Lambertian {
+            albedo: get_vec(&node, "albedo"),
         }),
-    };
-    world.add(Box::new(ground));
+        "Metal" => Box::new(Metal {
+            albedo: get_vec(&node, "albedo"),
+            fuzz: get_float(&node, "fuzz"),
+        }),
+        "Dielectric" => Box::new(Dielectric {
+            refraction_index: get_float(&node, "refraction_index"),
+        }),
+        _ => panic!("Unknown object type {}", node.name().value()),
+    }
+}
 
-    for a in -11..11 {
-        for b in -11..11 {
-            let choose_mat: f64 = random();
-            let center = point!(
-                (a as f64) + 0.9 * random::<f64>(),
-                0.2,
-                (b as f64) + 0.9 * random::<f64>()
-            );
+fn parse_group(kdl: &KdlDocument) -> Group {
+    let mut group = Group::default();
+    for node in kdl.nodes() {
+        group.add(match node.name().value() {
+            "Sphere" => Box::new(Sphere {
+                center: get_vec(&node, "center"),
+                radius: get_float(&node, "radius"),
+                mat: parse_mat(&node.children().unwrap().get("mat").unwrap()),
+            }),
+            _ => panic!("Unknown object type {}", node.name().value()),
+        });
+    }
+    group
+}
 
-            if (center - point!(4.0, 0.2, 0.0)).length() > 0.9 {
-                if choose_mat < 0.8 {
-                    // diffuse
-                    let albedo = Color::random() * Color::random();
-                    world.add(Box::new(Sphere {
-                        center,
-                        radius: 0.2,
-                        mat: Box::new(Lambertian { albedo }),
-                    }));
-                } else if choose_mat < 0.95 {
-                    // metal
-                    let albedo = Color::random_in_range(0.5, 0.1);
-                    let fuzz = random_in_range(0.0, 0.5);
-                    world.add(Box::new(Sphere {
-                        center,
-                        radius: 0.2,
-                        mat: Box::new(Metal { albedo, fuzz }),
-                    }));
-                } else {
-                    // glass
-                    world.add(Box::new(Sphere {
-                        center,
-                        radius: 0.2,
-                        mat: Box::new(Dielectric {
-                            refraction_index: 1.5,
-                        }),
-                    }))
-                }
-            }
-        }
+fn get_world(kdl: &KdlDocument) -> Group {
+    parse_group(kdl.get("World").unwrap().children().unwrap())
+}
+
+fn load_scene(path: String) -> Result<Scene, Error> {
+    let scene_kdl = KdlDocument::parse_v2(&fs::read_to_string(path)?)?;
+
+    Ok(Scene::new(get_camera(&scene_kdl), get_world(&scene_kdl)))
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        println!("Usage: yarr <path_to_file.kdl>");
+        return;
     }
 
-    world.add(Box::new(Sphere {
-        center: point!(0.0, 1.0, 0.0),
-        radius: 1.0,
-        mat: Box::new(Dielectric {
-            refraction_index: 1.5,
-        }),
-    }));
-
-    world.add(Box::new(Sphere {
-        center: point!(-4.0, 1.0, 0.0),
-        radius: 1.0,
-        mat: Box::new(Lambertian {
-            albedo: rgb!(0.4, 0.2, 0.1),
-        }),
-    }));
-
-    world.add(Box::new(Sphere {
-        center: point!(4.0, 1.0, 0.0),
-        radius: 1.0,
-        mat: Box::new(Metal {
-            albedo: rgb!(0.7, 0.6, 0.5),
-            fuzz: 0.0,
-        }),
-    }));
-
-    let camera = Camera::new(
-        400,
-        225,
-        20.0,
-        point!(13.0, 2.0, 3.0),
-        point!(0.0, 0.0, 0.0),
-        vec3!(0.0, 1.0, 0.0),
-        0.6,
-        10.0,
-        10,
-        50,
-    );
-
-    let scene = Scene::new(camera, world);
+    let scene =
+        load_scene(args[1].clone()).unwrap_or_else(|err| panic!("Failed to load scene: {}", err.0));
 
     let cpus = num_cpus::get();
 
