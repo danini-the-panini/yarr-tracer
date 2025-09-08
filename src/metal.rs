@@ -22,7 +22,7 @@ impl Material for Metal {
 
         Some(Scatter {
             att: self.albedo,
-            ray: Ray::new(hit.p, reflected, 0.0),
+            ray: Ray::new(hit.p, reflected, r_in.time),
         })
     }
 }

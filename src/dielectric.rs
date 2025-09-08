@@ -39,7 +39,7 @@ impl Material for Dielectric {
 
         Some(Scatter {
             att: rgb!(1.0, 1.0, 1.0),
-            ray: Ray::new(hit.p, direction, 0.0),
+            ray: Ray::new(hit.p, direction, r_in.time),
         })
     }
 }

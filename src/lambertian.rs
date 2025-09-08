@@ -20,7 +20,7 @@ impl Material for Lambertian {
 
         Some(Scatter {
             att: self.albedo,
-            ray: Ray::new(hit.p, scatter_direction, 0.0),
+            ray: Ray::new(hit.p, scatter_direction, r_in.time),
         })
     }
 }

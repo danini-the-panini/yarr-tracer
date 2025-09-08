@@ -4,17 +4,37 @@ use crate::{
     math::Vec3,
     object::{Hit, Object},
     ray::Ray,
+    vec3,
 };
 
 pub struct Sphere {
-    pub center: Vec3,
+    pub center: Ray,
     pub radius: f64,
     pub mat: Box<dyn Material>,
 }
 
+impl Sphere {
+    pub fn stationary(center: Vec3, radius: f64, mat: Box<dyn Material>) -> Self {
+        Self {
+            center: Ray::new(center, vec3!(0.0, 0.0, 0.0), 0.0),
+            radius,
+            mat,
+        }
+    }
+
+    pub fn moving(center1: Vec3, center2: Vec3, radius: f64, mat: Box<dyn Material>) -> Self {
+        Self {
+            center: Ray::new(center1, center2 - center1, 0.0),
+            radius,
+            mat,
+        }
+    }
+}
+
 impl Object for Sphere {
     fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit<'_>> {
-        let oc = self.center - r.origin;
+        let center = self.center.at(r.time);
+        let oc = center - r.origin;
         let a = r.direction.length_squared();
         let h = r.direction.dot(&oc);
         let c = oc.length_squared() - self.radius * self.radius;
@@ -37,12 +57,6 @@ impl Object for Sphere {
 
         let p = r.at(root);
 
-        Some(Hit::new(
-            root,
-            p,
-            r,
-            (p - self.center) / self.radius,
-            &self.mat,
-        ))
+        Some(Hit::new(root, p, r, (p - center) / self.radius, &self.mat))
     }
 }
