@@ -1,8 +1,10 @@
 use std::fs;
 
+use crate::bvh::BVH;
 use crate::group::Group;
 use crate::material::Material;
 use crate::math::Vec3;
+use crate::object::Object;
 use crate::scene::Scene;
 use crate::sphere::Sphere;
 use crate::{camera::Camera, error::Error};
@@ -84,18 +86,19 @@ fn parse_sphere(node: &KdlNode) -> Sphere {
     }
 }
 
-fn parse_group(kdl: &KdlDocument) -> Group {
-    let mut group = Group::default();
-    for node in kdl.nodes() {
-        group.add(match node.name().value() {
-            "Sphere" => Box::new(parse_sphere(node)),
+fn parse_group(kdl: &KdlDocument) -> Box<dyn Object> {
+    let objects = kdl
+        .nodes()
+        .iter()
+        .map(|node| match node.name().value() {
+            "Sphere" => Box::new(parse_sphere(node)) as Box<dyn Object>,
             _ => panic!("Unknown object type {}", node.name().value()),
-        });
-    }
-    group
+        })
+        .collect();
+    BVH::new(objects)
 }
 
-fn get_world(kdl: &KdlDocument) -> Group {
+fn get_world(kdl: &KdlDocument) -> Box<dyn Object> {
     parse_group(kdl.get("World").unwrap().children().unwrap())
 }
 

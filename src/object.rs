@@ -1,4 +1,5 @@
 use crate::{
+    aabb::AABB,
     interval::Interval,
     material::Material,
     math::{Point3, Vec3},
@@ -32,4 +33,5 @@ impl<'a> Hit<'a> {
 
 pub trait Object: Send + Sync {
     fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit<'_>>;
+    fn bbox(&self) -> &AABB;
 }

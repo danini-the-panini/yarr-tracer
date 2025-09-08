@@ -4,6 +4,8 @@ use thread_pool::{render_threaded, render_unthreaded};
 
 use crate::loader::load_scene;
 
+mod aabb;
+mod bvh;
 mod camera;
 mod color;
 mod dielectric;

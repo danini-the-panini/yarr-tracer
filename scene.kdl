@@ -7,7 +7,7 @@ Camera {
     vup 0.0 1.0 0.0
     defocus_angle 0.6
     focus_dist 10.0
-    samples 10
+    samples 100
     max_depth 50
 }
 World {

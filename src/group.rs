@@ -1,4 +1,5 @@
 use crate::{
+    aabb::AABB,
     interval::Interval,
     object::{Hit, Object},
     ray::Ray,
@@ -7,10 +8,20 @@ use crate::{
 #[derive(Default)]
 pub struct Group {
     pub objects: Vec<Box<dyn Object>>,
+    bbox: AABB,
 }
 
 impl Group {
+    pub fn new(objects: Vec<Box<dyn Object>>) -> Self {
+        let mut bbox = AABB::default();
+        for object in &objects {
+            bbox += object.bbox();
+        }
+        Self { objects, bbox }
+    }
+
     pub fn add(&mut self, object: Box<dyn Object>) {
+        self.bbox += object.bbox();
         self.objects.push(object);
     }
 }
@@ -28,5 +39,9 @@ impl Object for Group {
         }
 
         rec
+    }
+
+    fn bbox(&self) -> &AABB {
+        &self.bbox
     }
 }

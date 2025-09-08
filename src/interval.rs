@@ -29,9 +29,11 @@ impl Interval {
     pub fn new(min: f64, max: f64) -> Self {
         Interval { min, max }
     }
+
     pub fn from(min: f64) -> Self {
         Interval { min, max: INFINITY }
     }
+
     pub fn universe() -> Self {
         Interval {
             min: -INFINITY,

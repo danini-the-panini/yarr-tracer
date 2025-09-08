@@ -1,15 +1,12 @@
-use crate::{
-    camera::Camera, color::Color, group::Group, interval::Interval, math::Vec3, object::Object,
-    ray::Ray, rgb,
-};
+use crate::{camera::Camera, color::Color, interval::Interval, object::Object, ray::Ray, rgb};
 
 pub struct Scene {
     pub camera: Camera,
-    pub world: Group,
+    pub world: Box<dyn Object>,
 }
 
 impl Scene {
-    pub fn new(camera: Camera, world: Group) -> Self {
+    pub fn new(camera: Camera, world: Box<dyn Object>) -> Self {
         Self { camera, world }
     }
 
