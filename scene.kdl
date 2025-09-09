@@ -4212,7 +4212,7 @@ World {
         center 4.0 1.0 0.0
         radius 1.0
         mat Metal {
-            albedo 0.7 0.6 0.5
+            tex Image "earthmap.jpg"
             fuzz 0.0
         }
     }

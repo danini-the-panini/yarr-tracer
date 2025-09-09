@@ -12,6 +12,7 @@ mod color;
 mod dielectric;
 mod error;
 mod group;
+mod image;
 mod interval;
 mod lambertian;
 mod loader;

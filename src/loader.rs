@@ -2,6 +2,7 @@ use std::fs;
 
 use crate::bvh::BVH;
 use crate::checker::Checker;
+use crate::image::Image;
 use crate::material::Material;
 use crate::math::Vec3;
 use crate::object::Object;
@@ -84,6 +85,7 @@ fn parse_tex(node: &KdlNode) -> Box<dyn Texture> {
             node.get(3).unwrap().as_float().unwrap()
         ))),
         "Checker" => Box::new(parse_checker(node)),
+        "Image" => Box::new(Image::load(node.get(1).unwrap().as_string().unwrap()).unwrap()),
         _ => panic!("Unknown texture type {}", node.name().value()),
     }
 }
@@ -98,13 +100,22 @@ fn parse_lambert(node: &KdlNode) -> Lambertian {
     }
 }
 
+fn parse_metal(node: &KdlNode) -> Metal {
+    let fuzz = get_float(node, "fuzz");
+    if node.children().unwrap().get("albedo").is_some() {
+        Metal::solid(get_vec(node, "albedo"), fuzz)
+    } else {
+        Metal {
+            tex: parse_tex(&node.children().unwrap().get("tex").unwrap()),
+            fuzz,
+        }
+    }
+}
+
 fn parse_mat(node: &KdlNode) -> Box<dyn Material> {
     match node.get(0).unwrap().as_string().unwrap() {
         "Lambertian" => Box::new(parse_lambert(node)),
-        "Metal" => Box::new(Metal {
-            albedo: get_vec(node, "albedo"),
-            fuzz: get_float(node, "fuzz"),
-        }),
+        "Metal" => Box::new(parse_metal(node)),
         "Dielectric" => Box::new(Dielectric {
             refraction_index: get_float(node, "refraction_index"),
         }),

@@ -1,3 +1,5 @@
+use image::Rgba;
+
 use crate::math::Vec3;
 use crate::{interval::Interval, util::linear_to_gamma};
 
@@ -42,6 +44,17 @@ impl Color {
 
         // Return the pixel color components.
         (rbyte, gbyte, bbyte)
+    }
+}
+
+impl From<Rgba<u8>> for Color {
+    fn from(Rgba(pixel): Rgba<u8>) -> Self {
+        let color_scale = 1.0 / 255.0;
+        rgb!(
+            color_scale * pixel[0] as f64,
+            color_scale * pixel[1] as f64,
+            color_scale * pixel[2] as f64
+        )
     }
 }
 

@@ -4,11 +4,22 @@ use crate::{
     math::Vec3,
     object::Hit,
     ray::Ray,
+    solid_color::SolidColor,
+    texture::Texture,
 };
 
 pub struct Metal {
-    pub albedo: Color,
+    pub tex: Box<dyn Texture>,
     pub fuzz: f64,
+}
+
+impl Metal {
+    pub fn solid(albedo: Color, fuzz: f64) -> Self {
+        Self {
+            tex: Box::new(SolidColor(albedo)),
+            fuzz,
+        }
+    }
 }
 
 impl Material for Metal {
@@ -21,7 +32,7 @@ impl Material for Metal {
         }
 
         Some(Scatter {
-            att: self.albedo,
+            att: self.tex.sample(hit.uv, hit.p),
             ray: Ray::new(hit.p, reflected, r_in.time),
         })
     }
