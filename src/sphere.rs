@@ -5,6 +5,7 @@ use crate::{
     math::Vec3,
     object::{Hit, Object},
     ray::Ray,
+    util::sphere_uv,
     vec3,
 };
 
@@ -64,8 +65,9 @@ impl Object for Sphere {
         }
 
         let p = r.at(root);
+        let normal = (p - center) / self.radius;
 
-        Some(Hit::new(root, p, r, (p - center) / self.radius, &self.mat))
+        Some(Hit::new(root, p, r, normal, sphere_uv(&normal), &self.mat))
     }
 
     fn bbox(&self) -> &AABB {

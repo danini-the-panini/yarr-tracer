@@ -7,6 +7,7 @@ use crate::loader::load_scene;
 mod aabb;
 mod bvh;
 mod camera;
+mod checker;
 mod color;
 mod dielectric;
 mod error;
@@ -20,8 +21,10 @@ mod metal;
 mod object;
 mod ray;
 mod scene;
+mod solid_color;
 mod sphere;
 mod test_data;
+mod texture;
 mod thread_pool;
 mod util;
 

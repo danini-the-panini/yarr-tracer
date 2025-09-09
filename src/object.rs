@@ -2,7 +2,7 @@ use crate::{
     aabb::AABB,
     interval::Interval,
     material::Material,
-    math::{Point3, Vec3},
+    math::{Point3, Vec2, Vec3},
     ray::Ray,
 };
 
@@ -11,11 +11,19 @@ pub struct Hit<'a> {
     pub p: Point3,
     pub normal: Vec3,
     pub front_face: bool,
+    pub uv: Vec2,
     pub mat: &'a Box<dyn Material>,
 }
 
 impl<'a> Hit<'a> {
-    pub fn new(t: f64, p: Vec3, r: &Ray, outward_normal: Vec3, mat: &'a Box<dyn Material>) -> Self {
+    pub fn new(
+        t: f64,
+        p: Vec3,
+        r: &Ray,
+        outward_normal: Vec3,
+        uv: Vec2,
+        mat: &'a Box<dyn Material>,
+    ) -> Self {
         let front_face = r.direction.dot(&outward_normal) < 0.0;
         Self {
             t,
@@ -26,6 +34,7 @@ impl<'a> Hit<'a> {
                 -outward_normal
             },
             front_face,
+            uv,
             mat,
         }
     }

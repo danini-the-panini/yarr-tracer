@@ -1,12 +1,15 @@
 use std::fs;
 
 use crate::bvh::BVH;
-use crate::group::Group;
+use crate::checker::Checker;
 use crate::material::Material;
 use crate::math::Vec3;
 use crate::object::Object;
 use crate::scene::Scene;
+use crate::solid_color::SolidColor;
 use crate::sphere::Sphere;
+use crate::texture::Texture;
+use crate::vec3;
 use crate::{camera::Camera, error::Error};
 use kdl::{KdlDocument, KdlNode};
 
@@ -19,7 +22,7 @@ fn get_vec(node: &KdlNode, key: &str) -> Vec3 {
         .iter_args(key)
         .map(|v| v.as_float().unwrap())
         .collect();
-    Vec3::new(values[0], values[1], values[2])
+    vec3!(values[0], values[1], values[2])
 }
 
 fn get_float(node: &KdlNode, key: &str) -> f64 {
@@ -55,11 +58,49 @@ fn get_camera(kdl: &KdlDocument) -> Camera {
     )
 }
 
+fn parse_checker_tex(node: &KdlNode, key: &str) -> Box<dyn Texture> {
+    let tnode = node.children().unwrap().get(key).unwrap();
+    if tnode.get(0).unwrap().is_string() {
+        parse_tex(&tnode)
+    } else {
+        Box::new(SolidColor(get_vec(node, key)))
+    }
+}
+
+fn parse_checker(node: &KdlNode) -> Checker {
+    let scale = get_float(node, "scale");
+    Checker::new(
+        scale,
+        parse_checker_tex(node, "even"),
+        parse_checker_tex(node, "odd"),
+    )
+}
+
+fn parse_tex(node: &KdlNode) -> Box<dyn Texture> {
+    match node.get(0).unwrap().as_string().unwrap() {
+        "Solid" => Box::new(SolidColor(vec3!(
+            node.get(1).unwrap().as_float().unwrap(),
+            node.get(2).unwrap().as_float().unwrap(),
+            node.get(3).unwrap().as_float().unwrap()
+        ))),
+        "Checker" => Box::new(parse_checker(node)),
+        _ => panic!("Unknown texture type {}", node.name().value()),
+    }
+}
+
+fn parse_lambert(node: &KdlNode) -> Lambertian {
+    if node.children().unwrap().get("albedo").is_some() {
+        Lambertian::solid(get_vec(node, "albedo"))
+    } else {
+        Lambertian {
+            tex: parse_tex(&node.children().unwrap().get("tex").unwrap()),
+        }
+    }
+}
+
 fn parse_mat(node: &KdlNode) -> Box<dyn Material> {
     match node.get(0).unwrap().as_string().unwrap() {
-        "Lambertian" => Box::new(Lambertian {
-            albedo: get_vec(node, "albedo"),
-        }),
+        "Lambertian" => Box::new(parse_lambert(node)),
         "Metal" => Box::new(Metal {
             albedo: get_vec(node, "albedo"),
             fuzz: get_float(node, "fuzz"),
