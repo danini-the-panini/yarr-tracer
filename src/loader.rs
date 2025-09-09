@@ -6,6 +6,7 @@ use crate::image::Image;
 use crate::material::Material;
 use crate::math::Vec3;
 use crate::object::Object;
+use crate::perlin::Perlin;
 use crate::scene::Scene;
 use crate::solid_color::SolidColor;
 use crate::sphere::Sphere;
@@ -86,6 +87,7 @@ fn parse_tex(node: &KdlNode) -> Box<dyn Texture> {
         ))),
         "Checker" => Box::new(parse_checker(node)),
         "Image" => Box::new(Image::load(node.get(1).unwrap().as_string().unwrap()).unwrap()),
+        "Noise" => Box::new(Perlin::new(get_float(node, "scale"))),
         _ => panic!("Unknown texture type {}", node.name().value()),
     }
 }

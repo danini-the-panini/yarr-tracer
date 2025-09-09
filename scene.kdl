@@ -1,13 +1,13 @@
 Camera {
-    image_width 400
-    image_height 225
+    image_width 1280
+    image_height 720
     vfov 20.0
     lookfrom 13.0 2.0 3.0
     lookat 0.0 0.0 0.0
     vup 0.0 1.0 0.0
     defocus_angle 0.6
     focus_dist 10.0
-    samples 10
+    samples 100
     max_depth 50
 }
 World {
@@ -15,11 +15,12 @@ World {
         center 0.0 -1000.0 0.0
         radius 1000.0
         mat Lambertian {
-            tex Checker {
-                scale 0.32
-                even 0.2 0.3 0.1
-                odd 0.9 0.9 0.9
-            }
+            // tex Checker {
+            //     scale 0.32
+            //     even 0.2 0.3 0.1
+            //     odd 0.9 0.9 0.9
+            // }
+            tex Noise
         }
     }
     Sphere {
@@ -4205,14 +4206,16 @@ World {
         center -4.0 1.0 0.0
         radius 1.0
         mat Lambertian {
-            albedo 0.4 0.2 0.1
+            // albedo 0.4 0.2 0.1
+            tex Noise
         }
     }
     Sphere {
         center 4.0 1.0 0.0
         radius 1.0
         mat Metal {
-            tex Image "earthmap.jpg"
+            // tex Image "earthmap.jpg"
+            tex Noise
             fuzz 0.0
         }
     }

@@ -20,6 +20,7 @@ mod material;
 mod math;
 mod metal;
 mod object;
+mod perlin;
 mod ray;
 mod scene;
 mod solid_color;
