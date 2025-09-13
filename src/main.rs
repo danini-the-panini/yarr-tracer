@@ -21,6 +21,7 @@ mod math;
 mod metal;
 mod object;
 mod perlin;
+mod quad;
 mod ray;
 mod scene;
 mod solid_color;

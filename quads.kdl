@@ -1,0 +1,51 @@
+Camera {
+	image_width 400
+	image_height 225
+	vfov 80.0
+	lookfrom 0.0 0.0 9.0
+	lookat 0.0 0.0 0.0
+	vup 0.0 1.0 0.0
+	defocus_angle 0.0
+	focus_dist 10.0
+	samples 100
+	max_depth 50
+}
+Materials {
+	left_red     Lambertian { albedo 1.0 0.2 0.2 }
+	back_green   Lambertian { albedo 0.2 1.0 0.2 }
+	right_blue   Lambertian { albedo 0.2 0.2 1.0 }
+	upper_orange Lambertian { albedo 1.0 0.5 0.0 }
+	lower_teal   Lambertian { albedo 0.2 0.8 0.8 }
+}
+World {
+	Quad {
+		q -3.0 -2.0  5.0
+		u 0.0  0.0 -4.0
+		v 0.0  4.0  0.0
+		mat left_red
+	}
+	Quad {
+		q -2.0 -2.0  0.0
+		u 4.0  0.0  0.0
+		v 0.0  4.0  0.0
+		mat back_green
+	}
+	Quad {
+		q 3.0 -2.0  1.0
+		u 0.0  0.0  4.0
+		v 0.0  4.0  0.0
+		mat right_blue
+	}
+	Quad {
+		q -2.0  3.0  1.0
+		u 4.0  0.0  0.0
+		v 0.0  0.0  4.0
+		mat upper_orange
+	}
+	Quad {
+		q -2.0 -3.0  5.0
+		u 4.0  0.0  0.0
+		v 0.0  0.0 -4.0
+		mat lower_teal
+	}
+}

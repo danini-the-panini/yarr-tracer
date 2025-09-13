@@ -10,7 +10,9 @@ pub struct AABB {
 
 impl AABB {
     pub fn new(x: Interval, y: Interval, z: Interval) -> Self {
-        Self { x, y, z }
+        let mut aabb = Self { x, y, z };
+        aabb.pad_to_minimums();
+        aabb
     }
 
     pub fn from_points(a: Point3, b: Point3) -> Self {
@@ -88,6 +90,20 @@ impl AABB {
             }
         }
         true
+    }
+
+    fn pad_to_minimums(&mut self) -> &Self {
+        let delta = 0.0001;
+        if self.x.size() < delta {
+            self.x = self.x + delta
+        }
+        if self.y.size() < delta {
+            self.y = self.y + delta
+        }
+        if self.z.size() < delta {
+            self.z = self.z + delta
+        }
+        self
     }
 }
 

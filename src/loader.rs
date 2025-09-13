@@ -9,6 +9,7 @@ use crate::material::Material;
 use crate::math::Vec3;
 use crate::object::Object;
 use crate::perlin::Noise;
+use crate::quad::Quad;
 use crate::scene::Scene;
 use crate::solid_color::SolidColor;
 use crate::sphere::Sphere;
@@ -151,10 +152,18 @@ impl KdlLoader {
         }
     }
 
-    fn parse_sphere(&self, node: &KdlNode) -> Sphere {
+    fn parse_quad(&self, node: &KdlNode) -> Box<dyn Object> {
+        let q = get_vec(node, "q");
+        let u = get_vec(node, "u");
+        let v = get_vec(node, "v");
+        let mat = self.get_mat(&node.children().unwrap().get("mat").unwrap());
+        Box::new(Quad::new(q, u, v, &mat))
+    }
+
+    fn parse_sphere(&self, node: &KdlNode) -> Box<dyn Object> {
         let radius = get_float(node, "radius");
         let mat = self.get_mat(&node.children().unwrap().get("mat").unwrap());
-        if node.children().unwrap().get_arg("center").is_some() {
+        Box::new(if node.children().unwrap().get_arg("center").is_some() {
             Sphere::stationary(get_vec(node, "center"), radius, &mat)
         } else {
             Sphere::moving(
@@ -163,7 +172,7 @@ impl KdlLoader {
                 radius,
                 &mat,
             )
-        }
+        })
     }
 
     fn parse_group(&self, kdl: &KdlDocument) -> Box<dyn Object> {
@@ -171,7 +180,8 @@ impl KdlLoader {
             .nodes()
             .iter()
             .map(|node| match node.name().value() {
-                "Sphere" => Box::new(self.parse_sphere(node)) as Box<dyn Object>,
+                "Sphere" => self.parse_sphere(node),
+                "Quad" => self.parse_quad(node),
                 _ => panic!("Unknown object type {}", node.name().value()),
             })
             .collect();
