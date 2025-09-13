@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     color::Color,
     math::{Point3, Vec2},
@@ -7,21 +9,25 @@ use crate::{
 
 pub struct Checker {
     inv_scale: f64,
-    even: Box<dyn Texture>,
-    odd: Box<dyn Texture>,
+    even: Arc<dyn Texture>,
+    odd: Arc<dyn Texture>,
 }
 
 impl Checker {
-    pub fn new(scale: f64, even: Box<dyn Texture>, odd: Box<dyn Texture>) -> Self {
+    pub fn new(scale: f64, even: &Arc<dyn Texture>, odd: &Arc<dyn Texture>) -> Self {
         Self {
             inv_scale: 1.0 / scale,
-            even,
-            odd,
+            even: Arc::clone(even),
+            odd: Arc::clone(odd),
         }
     }
 
     pub fn solid(scale: f64, even: Color, odd: Color) -> Self {
-        Self::new(scale, Box::new(SolidColor(even)), Box::new(SolidColor(odd)))
+        Self {
+            inv_scale: 1.0 / scale,
+            even: Arc::new(SolidColor(even)),
+            odd: Arc::new(SolidColor(odd)),
+        }
     }
 }
 

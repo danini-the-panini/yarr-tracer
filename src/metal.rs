@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     color::Color,
     material::{Material, Scatter},
@@ -9,14 +11,14 @@ use crate::{
 };
 
 pub struct Metal {
-    pub tex: Box<dyn Texture>,
+    pub tex: Arc<dyn Texture>,
     pub fuzz: f64,
 }
 
 impl Metal {
     pub fn solid(albedo: Color, fuzz: f64) -> Self {
         Self {
-            tex: Box::new(SolidColor(albedo)),
+            tex: Arc::new(SolidColor(albedo)),
             fuzz,
         }
     }

@@ -27,7 +27,7 @@ impl Group {
 }
 
 impl Object for Group {
-    fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit<'_>> {
+    fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit> {
         let mut rec: Option<Hit> = None;
         let mut closest = ray_t.max;
 

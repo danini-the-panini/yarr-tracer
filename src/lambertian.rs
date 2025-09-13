@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     color::Color,
     material::{Material, Scatter},
@@ -9,13 +11,13 @@ use crate::{
 };
 
 pub struct Lambertian {
-    pub tex: Box<dyn Texture>,
+    pub tex: Arc<dyn Texture>,
 }
 
 impl Lambertian {
     pub fn solid(albedo: Color) -> Self {
         Self {
-            tex: Box::new(SolidColor(albedo)),
+            tex: Arc::new(SolidColor(albedo)),
         }
     }
 }

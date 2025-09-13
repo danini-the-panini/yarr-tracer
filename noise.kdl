@@ -10,19 +10,23 @@ Camera {
 	samples 100
 	max_depth 50
 }
+Textures {
+	noise Noise "0.5 * (1.0 + sin(4.0 * z + 10.0 * turb(p, 7)))"
+}
+Materials {
+	marble Lambertian {
+		tex noise
+	}
+}
 World {
 	Sphere {
 		center 0.0 -1000.0 0.0
 		radius 1000.0
-		mat Lambertian {
-			tex Noise "0.5 * (1.0 + sin(4.0 * z + 10.0 * turb(p, 7)))"
-		}
+		mat marble
 	}
 	Sphere {
 		center 0.0 2.0 0.0
 		radius 2.0
-		mat Lambertian {
-			tex Noise "0.5 * (1.0 + sin(4.0 * z + 10.0 * turb(p, 7)))"
-		}
+		mat marble
 	}
 }

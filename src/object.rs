@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     aabb::AABB,
     interval::Interval,
@@ -6,23 +8,23 @@ use crate::{
     ray::Ray,
 };
 
-pub struct Hit<'a> {
+pub struct Hit {
     pub t: f64,
     pub p: Point3,
     pub normal: Vec3,
     pub front_face: bool,
     pub uv: Vec2,
-    pub mat: &'a Box<dyn Material>,
+    pub mat: Arc<dyn Material>,
 }
 
-impl<'a> Hit<'a> {
+impl Hit {
     pub fn new(
         t: f64,
         p: Vec3,
         r: &Ray,
         outward_normal: Vec3,
         uv: Vec2,
-        mat: &'a Box<dyn Material>,
+        mat: &Arc<dyn Material>,
     ) -> Self {
         let front_face = r.direction.dot(&outward_normal) < 0.0;
         Self {
@@ -35,12 +37,12 @@ impl<'a> Hit<'a> {
             },
             front_face,
             uv,
-            mat,
+            mat: Arc::clone(mat),
         }
     }
 }
 
 pub trait Object: Send + Sync {
-    fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit<'_>>;
+    fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit>;
     fn bbox(&self) -> &AABB;
 }
