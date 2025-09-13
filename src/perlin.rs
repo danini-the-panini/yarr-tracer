@@ -1,14 +1,77 @@
-use std::array;
+use exmex::{ArrayType, ExError, Express, FlatEx, MakeOperators, Operator, Val, ValOpsFactory};
+use smallvec::smallvec;
+use std::{array, sync::LazyLock};
 
 use rand::{rng, seq::SliceRandom};
 
 use crate::{
     color::Color,
-    math::{Point3, Vec2, Vec3},
-    rgb,
+    error,
+    math::{Point3, Vec2, Vec3, Vector},
     texture::Texture,
     vec3,
 };
+
+static PERLIN: LazyLock<Perlin> = LazyLock::new(|| Perlin::new());
+
+impl From<Val> for Vector<4> {
+    fn from(val: Val) -> Self {
+        match val {
+            Val::Array(v) => Vector(v.into_inner().unwrap_or_default()),
+            Val::Float(v) => Vector::repeat(v),
+            Val::Int(v) => Vector::repeat(v as f64),
+            _ => Vector::repeat(0.0),
+        }
+    }
+}
+
+impl From<Val> for Vector<3> {
+    fn from(val: Val) -> Self {
+        match val {
+            Val::Array(v) => vec3!(v[0], v[1], v[2]),
+            Val::Float(v) => Vector::repeat(v),
+            Val::Int(v) => Vector::repeat(v as f64),
+            _ => Vector::repeat(0.0),
+        }
+    }
+}
+
+impl From<Val> for Vector<2> {
+    fn from(val: Val) -> Self {
+        match val {
+            Val::Array(v) => Vec2::new(v[0], v[1]),
+            Val::Float(v) => Vector::repeat(v),
+            Val::Int(v) => Vector::repeat(v as f64),
+            _ => Vector::repeat(0.0),
+        }
+    }
+}
+
+impl<const N: usize> Into<Val> for Vector<N> {
+    fn into(self) -> Val {
+        Val::Array(ArrayType::from_slice(&self.0))
+    }
+}
+
+#[derive(Clone, Debug)]
+struct NoiseOpsFactory;
+impl MakeOperators<Val> for NoiseOpsFactory {
+    fn make<'a>() -> Vec<Operator<'a, Val>> {
+        let mut ops = ValOpsFactory::make();
+        ops.push(Operator::make_unary("noise", |a| {
+            Val::Float(PERLIN.noise(&a.into()))
+        }));
+        ops.push(Operator::make_bin(
+            "turb",
+            exmex::BinOp {
+                apply: |a, b| Val::Float(PERLIN.turb(&a.into(), b.to_int().unwrap_or_default())),
+                prio: 0,
+                is_commutative: false,
+            },
+        ));
+        ops
+    }
+}
 
 const POINT_COUNT: usize = 256;
 
@@ -39,11 +102,10 @@ pub struct Perlin {
     perm_x: [usize; POINT_COUNT],
     perm_y: [usize; POINT_COUNT],
     perm_z: [usize; POINT_COUNT],
-    scale: f64,
 }
 
 impl Perlin {
-    pub fn new(scale: f64) -> Self {
+    pub fn new() -> Self {
         let mut perm_x: [usize; POINT_COUNT] = array::from_fn(|i| i);
         perm_x.shuffle(&mut rng());
         let mut perm_y: [usize; POINT_COUNT] = array::from_fn(|j| j);
@@ -55,7 +117,6 @@ impl Perlin {
             perm_x,
             perm_y,
             perm_z,
-            scale,
         }
     }
 
@@ -80,10 +141,53 @@ impl Perlin {
 
         trilinear_interp(&c, &vec)
     }
+
+    pub fn turb(&self, p: &Point3, depth: i32) -> f64 {
+        let mut accum = 0.0;
+        let mut temp_p = *p;
+        let mut weight = 1.0;
+
+        for _ in 0..depth {
+            accum += weight * self.noise(&temp_p);
+            weight *= 0.5;
+            temp_p *= 2.0;
+        }
+
+        accum.abs()
+    }
 }
 
-impl Texture for Perlin {
+type FlatExNoise = FlatEx<Val, NoiseOpsFactory>;
+
+pub struct Noise(FlatExNoise);
+
+impl Noise {
+    pub fn parse(expr: &str) -> Result<Self, error::Error> {
+        let expr = FlatExNoise::parse(expr)?;
+        Ok(Self(expr))
+    }
+}
+
+impl Texture for Noise {
     fn sample(&self, uv: Vec2, p: Point3) -> Color {
-        rgb!(0.5, 0.5, 0.5) * (1.0 + self.noise(&(p * self.scale)))
+        let vars: Vec<Val> = self
+            .0
+            .var_names()
+            .iter()
+            .map(|var| match var.as_str() {
+                "p" => p.into(),
+                "x" => Val::Float(p.x()),
+                "y" => Val::Float(p.y()),
+                "z" => Val::Float(p.z()),
+                "uv" => uv.into(),
+                "u" => Val::Float(uv.u()),
+                "v" => Val::Float(uv.v()),
+                _ => Val::Error(ExError::new(format!("unknown variable {}", var).as_str())),
+            })
+            .collect();
+        self.0
+            .eval_vec(vars)
+            .unwrap_or(Val::Array(smallvec![1.0, 0.0, 1.0]))
+            .into()
     }
 }

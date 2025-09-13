@@ -15,18 +15,14 @@ World {
 		center 0.0 -1000.0 0.0
 		radius 1000.0
 		mat Lambertian {
-			tex Noise {
-				scale 4.0
-			}
+			tex Noise "0.5 * (1.0 + sin(4.0 * z + 10.0 * turb(p, 7)))"
 		}
 	}
 	Sphere {
 		center 0.0 2.0 0.0
 		radius 2.0
 		mat Lambertian {
-			tex Noise {
-				scale 4.0
-			}
+			tex Noise "0.5 * (1.0 + sin(4.0 * z + 10.0 * turb(p, 7)))"
 		}
 	}
 }

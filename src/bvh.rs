@@ -1,7 +1,5 @@
 use std::cmp::Ordering;
 
-use rand::random_range;
-
 use crate::{
     aabb::AABB,
     group::Group,

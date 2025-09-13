@@ -17,9 +17,6 @@ pub struct Camera {
     pixel_delta_u: Vec3,
     pixel_delta_v: Vec3,
     pixel00_loc: Point3,
-    u: Vec3,
-    v: Vec3,
-    w: Vec3,
     defocus_disk_u: Vec3,
     defocus_disk_v: Vec3,
 }
@@ -81,9 +78,6 @@ impl Camera {
             pixel_delta_u,
             pixel_delta_v,
             pixel00_loc,
-            u,
-            v,
-            w,
             defocus_disk_u,
             defocus_disk_v,
         }

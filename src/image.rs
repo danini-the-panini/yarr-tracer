@@ -19,7 +19,7 @@ impl Image {
 }
 
 impl Texture for Image {
-    fn sample(&self, uv: Vec2, p: Point3) -> Color {
+    fn sample(&self, uv: Vec2, _p: Point3) -> Color {
         let u = uv.u().clamp(0.0, 1.0);
         let v = 1.0 - uv.v().clamp(0.0, 1.0);
 

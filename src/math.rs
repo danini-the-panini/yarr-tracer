@@ -1,4 +1,4 @@
-use std::{fmt, ops};
+use std::{cmp::Ordering, fmt, ops};
 
 use rand::random;
 
@@ -91,6 +91,28 @@ impl<const N: usize> Vector<N> {
 
     pub fn floored(&self) -> Self {
         Vector::<N>(self.0.map(|e| e.floor()))
+    }
+
+    pub fn ceil(&mut self) -> &Self {
+        for i in 0..N {
+            self.0[i] = self.0[i].ceil()
+        }
+        self
+    }
+
+    pub fn ceiled(&self) -> Self {
+        Vector::<N>(self.0.map(|e| e.ceil()))
+    }
+
+    pub fn round(&mut self) -> &Self {
+        for i in 0..N {
+            self.0[i] = self.0[i].round()
+        }
+        self
+    }
+
+    pub fn rounded(&self) -> Self {
+        Vector::<N>(self.0.map(|e| e.round()))
     }
 
     pub fn smooth(&mut self) -> &Self {
@@ -287,6 +309,28 @@ impl<const N: usize> ops::Div<f64> for Vector<N> {
 impl<const N: usize> fmt::Display for Vector<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:#?}", self.0)
+    }
+}
+
+impl<const N: usize> PartialOrd for Vector<N> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if (self - other).near_zero() {
+            Some(Ordering::Equal)
+        } else {
+            self.length_squared().partial_cmp(&other.length_squared())
+        }
+    }
+}
+
+impl<const N: usize> Eq for Vector<N> {}
+
+impl<const N: usize> Ord for Vector<N> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if (self - other).near_zero() {
+            Ordering::Equal
+        } else {
+            self.length_squared().total_cmp(&other.length_squared())
+        }
     }
 }
 
