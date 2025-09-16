@@ -61,6 +61,18 @@ impl Interval {
             x
         }
     }
+
+    pub fn pad(&mut self, x: f64) -> &Self {
+        let padding = x / 2.0;
+        self.min -= padding;
+        self.max += padding;
+        self
+    }
+
+    pub fn padded(&self, x: f64) -> Self {
+        let padding = x / 2.0;
+        Self::new(self.min - padding, self.max + padding)
+    }
 }
 
 impl ops::Add for Interval {
@@ -93,16 +105,14 @@ impl ops::Add<f64> for Interval {
     type Output = Interval;
 
     fn add(self, rhs: f64) -> Self::Output {
-        let padding = rhs / 2.0;
-        Interval::new(self.min - padding, self.max + padding)
+        Interval::new(self.min + rhs, self.max + rhs)
     }
 }
 
 impl ops::AddAssign<f64> for Interval {
     fn add_assign(&mut self, rhs: f64) {
-        let padding = rhs / 2.0;
-        self.min -= padding;
-        self.max += padding;
+        self.min -= rhs;
+        self.max += rhs;
     }
 }
 

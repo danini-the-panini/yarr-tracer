@@ -61,15 +61,27 @@ World {
 		v 0.0 555.0 0.0
 		mat white
 	}
-    Box {
-		a 130.0 0.0 65.0
-		b 295.0 165.0 230.0
-		mat white
+	Translate {
+		offset 265.0 0.0 295.0
+		obj RotateY {
+			angle 15.0
+			obj  Box {
+				a 0.0 0.0 0.0
+				b 165.0 330.0 165.0
+				mat white
+			}
+		}
 	}
-    Box {
-		a 265.0 0.0 295.0
-		b 430.0 330.0 460.0
-		mat white
+	Translate {
+		offset 130.0 0.0 65.0
+		obj RotateY {
+			angle -18.0
+			obj  Box {
+				a 0.0 0.0 0.0
+				b 165.0 165.0 165.0
+				mat white
+			}
+		}
 	}
 }
 Background Solid 0.0 0.0 0.0

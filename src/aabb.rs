@@ -1,4 +1,8 @@
-use crate::{interval::Interval, math::Point3, ray::Ray};
+use crate::{
+    interval::Interval,
+    math::{Point3, Vec3},
+    ray::Ray,
+};
 use std::ops;
 
 #[derive(Debug, Default)]
@@ -95,13 +99,13 @@ impl AABB {
     fn pad_to_minimums(&mut self) -> &Self {
         let delta = 0.0001;
         if self.x.size() < delta {
-            self.x = self.x + delta
+            self.x.pad(delta);
         }
         if self.y.size() < delta {
-            self.y = self.y + delta
+            self.y.pad(delta);
         }
         if self.z.size() < delta {
-            self.z = self.z + delta
+            self.z.pad(delta);
         }
         self
     }
@@ -136,5 +140,21 @@ impl ops::AddAssign<&AABB> for AABB {
         self.x += rhs.x;
         self.y += rhs.y;
         self.z += rhs.z;
+    }
+}
+
+impl ops::Add<Vec3> for AABB {
+    type Output = AABB;
+
+    fn add(self, rhs: Vec3) -> Self::Output {
+        AABB::new(self.x + rhs.x(), self.y + rhs.y(), self.z + rhs.z())
+    }
+}
+
+impl ops::Add<Vec3> for &AABB {
+    type Output = AABB;
+
+    fn add(self, rhs: Vec3) -> Self::Output {
+        AABB::new(self.x + rhs.x(), self.y + rhs.y(), self.z + rhs.z())
     }
 }

@@ -17,6 +17,7 @@ use crate::shapes::make_box;
 use crate::solid_color::SolidColor;
 use crate::sphere::Sphere;
 use crate::texture::Texture;
+use crate::transform::{RotateY, Translate};
 use crate::vec3;
 use crate::{camera::Camera, error::Error};
 use kdl::{KdlDocument, KdlNode};
@@ -214,16 +215,36 @@ impl KdlLoader {
         Box::new(make_box(a, b, mat))
     }
 
+    fn parse_translate(&self, node: &KdlNode) -> Box<dyn Object> {
+        let obj = node.children().unwrap().get("obj").unwrap();
+        let obj = self.parse_object(obj.get(0).unwrap().as_string().unwrap(), &obj);
+        let offset = get_vec(node, "offset");
+        Box::new(Translate::new(obj, offset))
+    }
+
+    fn parse_rotate_y(&self, node: &KdlNode) -> Box<dyn Object> {
+        let obj = node.children().unwrap().get("obj").unwrap();
+        let obj = self.parse_object(obj.get(0).unwrap().as_string().unwrap(), &obj);
+        let angle = get_float(node, "angle");
+        Box::new(RotateY::new(obj, angle))
+    }
+
+    fn parse_object(&self, name: &str, node: &KdlNode) -> Box<dyn Object> {
+        match name {
+            "Sphere" => self.parse_sphere(node),
+            "Quad" => self.parse_quad(node),
+            "Box" => self.parse_box(node),
+            "Translate" => self.parse_translate(node),
+            "RotateY" => self.parse_rotate_y(node),
+            _ => panic!("Unknown object type {}", node.name().value()),
+        }
+    }
+
     fn parse_group(&self, kdl: &KdlDocument) -> Box<dyn Object> {
         let objects = kdl
             .nodes()
             .iter()
-            .map(|node| match node.name().value() {
-                "Sphere" => self.parse_sphere(node),
-                "Quad" => self.parse_quad(node),
-                "Box" => self.parse_box(node),
-                _ => panic!("Unknown object type {}", node.name().value()),
-            })
+            .map(|node| self.parse_object(node.name().value(), node))
             .collect();
         BVH::new(objects)
     }

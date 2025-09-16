@@ -33,6 +33,7 @@ mod sphere;
 mod test_data;
 mod texture;
 mod thread_pool;
+mod transform;
 mod util;
 
 fn main() {
