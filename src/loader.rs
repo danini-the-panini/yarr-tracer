@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::background::{Background, BgExpr, Gradient};
 use crate::bvh::BVH;
 use crate::checker::Checker;
+use crate::constant_medium::ConstantMedium;
 use crate::diffuse_light::DiffuseLight;
 use crate::image::Image;
 use crate::material::Material;
@@ -229,6 +230,19 @@ impl KdlLoader {
         Box::new(RotateY::new(obj, angle))
     }
 
+    fn parse_constant_medium(&self, node: &KdlNode) -> Box<dyn Object> {
+        let children = node.children().unwrap();
+        let boundary = children.get("boundary").unwrap();
+        let boundary = self.parse_object(boundary.get(0).unwrap().as_string().unwrap(), &boundary);
+        let density = get_float(node, "density");
+        Box::new(if children.get("color").is_some() {
+            ConstantMedium::solid(boundary, density, get_vec(node, "color"))
+        } else {
+            let tex = self.get_tex(&children.get("tex").unwrap());
+            ConstantMedium::new(boundary, density, tex)
+        })
+    }
+
     fn parse_object(&self, name: &str, node: &KdlNode) -> Box<dyn Object> {
         match name {
             "Sphere" => self.parse_sphere(node),
@@ -236,6 +250,7 @@ impl KdlLoader {
             "Box" => self.parse_box(node),
             "Translate" => self.parse_translate(node),
             "RotateY" => self.parse_rotate_y(node),
+            "ConstantMedium" => self.parse_constant_medium(node),
             _ => panic!("Unknown object type {}", node.name().value()),
         }
     }

@@ -10,6 +10,7 @@ mod bvh;
 mod camera;
 mod checker;
 mod color;
+mod constant_medium;
 mod dielectric;
 mod diffuse_light;
 mod error;
