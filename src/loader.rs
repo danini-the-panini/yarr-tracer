@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
 
+use crate::background::{Background, BgExpr, Gradient};
 use crate::bvh::BVH;
 use crate::checker::Checker;
 use crate::image::Image;
 use crate::material::Material;
-use crate::math::Vec3;
+use crate::math::{Vec2, Vec3};
 use crate::object::Object;
 use crate::perlin::Noise;
 use crate::quad::Quad;
@@ -21,13 +22,26 @@ use kdl::{KdlDocument, KdlNode};
 use crate::{dielectric::Dielectric, lambertian::Lambertian, metal::Metal};
 
 fn get_vec(node: &KdlNode, key: &str) -> Vec3 {
-    let values: Vec<f64> = node
-        .children()
-        .unwrap()
-        .iter_args(key)
-        .map(|v| v.as_float().unwrap())
-        .collect();
-    vec3!(values[0], values[1], values[2])
+    get_vec_at(&node.children().unwrap().get(key).unwrap(), 0)
+}
+
+fn get_vec_at(node: &KdlNode, i: usize) -> Vec3 {
+    vec3!(
+        node.get(i).unwrap().as_float().unwrap(),
+        node.get(i + 1).unwrap().as_float().unwrap(),
+        node.get(i + 2).unwrap().as_float().unwrap()
+    )
+}
+
+fn get_vec2(node: &KdlNode, key: &str) -> Vec2 {
+    get_vec2_at(&node.children().unwrap().get(key).unwrap(), 0)
+}
+
+fn get_vec2_at(node: &KdlNode, i: usize) -> Vec2 {
+    Vec2::new(
+        node.get(i).unwrap().as_float().unwrap(),
+        node.get(i + 1).unwrap().as_float().unwrap(),
+    )
 }
 
 fn get_float(node: &KdlNode, key: &str) -> f64 {
@@ -79,6 +93,10 @@ fn parse_tex(node: &KdlNode) -> Arc<dyn Texture> {
     }
 }
 
+fn parse_gradient(node: &KdlNode) -> Gradient {
+    Gradient::new(get_vec(node, "top"), get_vec(node, "bottom"))
+}
+
 #[derive(Default)]
 struct KdlLoader {
     doc: KdlDocument,
@@ -97,8 +115,9 @@ impl KdlLoader {
         loader.load_materials();
         let world = loader.parse_world();
         let camera = loader.parse_camera();
+        let background = loader.parse_background();
 
-        Ok(Scene::new(camera, world))
+        Scene::new(camera, world, background)
     }
 
     fn parse_world(&self) -> Box<dyn Object> {
@@ -202,6 +221,32 @@ impl KdlLoader {
             get_int(&camera, "samples") as u32,
             get_int(&camera, "max_depth") as u32,
         )
+    }
+
+    fn parse_background(&self) -> Option<Box<dyn Background>> {
+        if let Some(node) = self.doc.get("Background") {
+            let ty = node.get(0).unwrap().as_string().unwrap();
+            Some(match ty {
+                "Solid" => Box::new(SolidColor(get_vec_at(&node, 1))),
+                "Gradient" => Box::new(parse_gradient(&node)),
+                // "ClearSky" => Box::new(ClearSky::new(
+                //     get_vec2(&node, "sun"),
+                //     get_float(&node, "scale"),
+                //     get_vec(&node, "sun_color"),
+                //     parse_gradient(node.children().unwrap().get("bg").unwrap()),
+                // )),
+                "Image" => {
+                    Box::new(Image::load(node.get(1).unwrap().as_string().unwrap()).unwrap())
+                }
+                "Expression" => Box::new(
+                    BgExpr::new(node.get(1).unwrap().as_string().unwrap().replace("\n", " "))
+                        .unwrap(),
+                ),
+                _ => panic!("unknown background type {}", ty),
+            })
+        } else {
+            None
+        }
     }
 
     fn load_textures(&mut self) {

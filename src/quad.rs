@@ -6,6 +6,7 @@ use crate::{
     material::Material,
     math::{Point3, Vec2, Vec3},
     object::{Hit, Object},
+    ray::Ray,
     util::EPSILON,
 };
 
@@ -52,11 +53,7 @@ impl Quad {
 }
 
 impl Object for Quad {
-    fn hit(
-        &self,
-        r: &crate::ray::Ray,
-        ray_t: &crate::interval::Interval,
-    ) -> Option<crate::object::Hit> {
+    fn hit(&self, r: &Ray, ray_t: &Interval) -> Option<Hit> {
         let denom = self.normal.dot(&r.direction);
 
         if denom.abs() < EPSILON {

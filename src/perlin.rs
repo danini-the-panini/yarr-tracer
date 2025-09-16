@@ -1,77 +1,19 @@
-use exmex::{ArrayType, ExError, Express, FlatEx, MakeOperators, Operator, Val, ValOpsFactory};
+use exmex::Val;
 use smallvec::smallvec;
-use std::{array, sync::LazyLock};
+use std::{array, collections::HashMap, sync::LazyLock};
 
 use rand::{rng, seq::SliceRandom};
 
 use crate::{
     color::Color,
     error,
-    math::{Point3, Vec2, Vec3, Vector},
+    expression::Expression,
+    math::{Point3, Vec2, Vec3},
     texture::Texture,
     vec3,
 };
 
-static PERLIN: LazyLock<Perlin> = LazyLock::new(|| Perlin::new());
-
-impl From<Val> for Vector<4> {
-    fn from(val: Val) -> Self {
-        match val {
-            Val::Array(v) => Vector(v.into_inner().unwrap_or_default()),
-            Val::Float(v) => Vector::repeat(v),
-            Val::Int(v) => Vector::repeat(v as f64),
-            _ => Vector::repeat(0.0),
-        }
-    }
-}
-
-impl From<Val> for Vector<3> {
-    fn from(val: Val) -> Self {
-        match val {
-            Val::Array(v) => vec3!(v[0], v[1], v[2]),
-            Val::Float(v) => Vector::repeat(v),
-            Val::Int(v) => Vector::repeat(v as f64),
-            _ => Vector::repeat(0.0),
-        }
-    }
-}
-
-impl From<Val> for Vector<2> {
-    fn from(val: Val) -> Self {
-        match val {
-            Val::Array(v) => Vec2::new(v[0], v[1]),
-            Val::Float(v) => Vector::repeat(v),
-            Val::Int(v) => Vector::repeat(v as f64),
-            _ => Vector::repeat(0.0),
-        }
-    }
-}
-
-impl<const N: usize> Into<Val> for Vector<N> {
-    fn into(self) -> Val {
-        Val::Array(ArrayType::from_slice(&self.0))
-    }
-}
-
-#[derive(Clone, Debug)]
-struct NoiseOpsFactory;
-impl MakeOperators<Val> for NoiseOpsFactory {
-    fn make<'a>() -> Vec<Operator<'a, Val>> {
-        let mut ops = ValOpsFactory::make();
-        ops.push(Operator::make_unary("noise", |a| {
-            Val::Float(PERLIN.noise(&a.into()))
-        }));
-        ops.push(Operator::make_bin(
-            "turb",
-            exmex::BinOp {
-                apply: |a, b| Val::Float(PERLIN.turb(&a.into(), b.to_int().unwrap_or_default())),
-                prio: 0,
-                is_commutative: false,
-            },
-        ));
-        ops
-    }
-}
+pub static PERLIN: LazyLock<Perlin> = LazyLock::new(|| Perlin::new());
 
 const POINT_COUNT: usize = 256;
 
@@ -157,36 +99,27 @@ impl Perlin {
     }
 }
 
-type FlatExNoise = FlatEx<Val, NoiseOpsFactory>;
-
-pub struct Noise(FlatExNoise);
+pub struct Noise(Expression);
 
 impl Noise {
     pub fn parse(expr: &str) -> Result<Self, error::Error> {
-        let expr = FlatExNoise::parse(expr)?;
+        let expr = Expression::parse(expr)?;
         Ok(Self(expr))
     }
 }
 
 impl Texture for Noise {
-    fn sample(&self, uv: Vec2, p: Point3) -> Color {
-        let vars: Vec<Val> = self
-            .0
-            .var_names()
-            .iter()
-            .map(|var| match var.as_str() {
-                "p" => p.into(),
-                "x" => Val::Float(p.x()),
-                "y" => Val::Float(p.y()),
-                "z" => Val::Float(p.z()),
-                "uv" => uv.into(),
-                "u" => Val::Float(uv.u()),
-                "v" => Val::Float(uv.v()),
-                _ => Val::Error(ExError::new(format!("unknown variable {}", var).as_str())),
-            })
-            .collect();
+    fn sample_tex(&self, uv: &Vec2, p: &Point3) -> Color {
         self.0
-            .eval_vec(vars)
+            .eval(HashMap::from([
+                ("p", p.into()),
+                ("x", Val::Float(p.x())),
+                ("y", Val::Float(p.y())),
+                ("z", Val::Float(p.z())),
+                ("uv", uv.into()),
+                ("u", Val::Float(uv.u())),
+                ("v", Val::Float(uv.v())),
+            ]))
             .unwrap_or(Val::Array(smallvec![1.0, 0.0, 1.0]))
             .into()
     }

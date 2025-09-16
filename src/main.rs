@@ -5,12 +5,15 @@ use thread_pool::{render_threaded, render_unthreaded};
 use crate::loader::load_scene;
 
 mod aabb;
+mod background;
 mod bvh;
 mod camera;
 mod checker;
 mod color;
 mod dielectric;
+mod diffuse_light;
 mod error;
+mod expression;
 mod group;
 mod image;
 mod interval;

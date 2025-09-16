@@ -32,15 +32,15 @@ impl Checker {
 }
 
 impl Texture for Checker {
-    fn sample(&self, uv: Vec2, p: Point3) -> Color {
+    fn sample_tex(&self, uv: &Vec2, p: &Point3) -> Color {
         let x = (self.inv_scale * p.x()).floor() as i32;
         let y = (self.inv_scale * p.y()).floor() as i32;
         let z = (self.inv_scale * p.z()).floor() as i32;
 
         if (x + y + z) % 2 == 0 {
-            self.even.sample(uv, p)
+            self.even.sample_tex(uv, p)
         } else {
-            self.odd.sample(uv, p)
+            self.odd.sample_tex(uv, p)
         }
     }
 }

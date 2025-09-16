@@ -4,5 +4,5 @@ use crate::{
 };
 
 pub trait Texture: Send + Sync {
-    fn sample(&self, uv: Vec2, p: Point3) -> Color;
+    fn sample_tex(&self, uv: &Vec2, p: &Point3) -> Color;
 }

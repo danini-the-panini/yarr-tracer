@@ -1,4 +1,10 @@
-use crate::{color::Color, rgb, texture::Texture};
+use crate::{
+    background::Background,
+    color::Color,
+    math::{Point3, Vec2, Vec3},
+    rgb,
+    texture::Texture,
+};
 
 pub struct SolidColor(pub Color);
 
@@ -9,7 +15,13 @@ impl SolidColor {
 }
 
 impl Texture for SolidColor {
-    fn sample(&self, _uv: crate::math::Vec2, _p: crate::math::Point3) -> Color {
+    fn sample_tex(&self, _uv: &Vec2, _p: &Point3) -> Color {
+        self.0
+    }
+}
+
+impl Background for SolidColor {
+    fn sample_bg(&self, _dir: &Vec3) -> Color {
         self.0
     }
 }

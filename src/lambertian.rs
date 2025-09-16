@@ -31,7 +31,7 @@ impl Material for Lambertian {
         }
 
         Some(Scatter {
-            att: self.tex.sample(hit.uv, hit.p),
+            att: self.tex.sample_tex(&hit.uv, &hit.p),
             ray: Ray::new(hit.p, scatter_direction, r_in.time),
         })
     }

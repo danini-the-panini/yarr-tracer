@@ -1,13 +1,31 @@
-use crate::{camera::Camera, color::Color, interval::Interval, object::Object, ray::Ray, rgb};
+use crate::{
+    background::{Background, Gradient},
+    camera::Camera,
+    color::Color,
+    error::Error,
+    interval::Interval,
+    object::Object,
+    ray::Ray,
+    rgb,
+};
 
 pub struct Scene {
     pub camera: Camera,
     pub world: Box<dyn Object>,
+    pub background: Box<dyn Background>,
 }
 
 impl Scene {
-    pub fn new(camera: Camera, world: Box<dyn Object>) -> Self {
-        Self { camera, world }
+    pub fn new(
+        camera: Camera,
+        world: Box<dyn Object>,
+        bg: Option<Box<dyn Background>>,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            camera,
+            world,
+            background: bg.unwrap_or_else(|| Box::new(Gradient::default())),
+        })
     }
 
     pub fn render(&self, i: usize, j: usize) -> (u8, u8, u8) {
@@ -32,9 +50,8 @@ impl Scene {
             }
         }
 
-        let unit_direction = r.direction.unit();
-        let a = 0.5 * (unit_direction.y() + 1.0);
-        (1.0 - a) * rgb!(1.0, 1.0, 1.0) + a * rgb!(0.5, 0.7, 1.0)
+        let dir = r.direction.unit();
+        self.background.sample_bg(&dir)
     }
 
     pub fn write_image_header(&self) {
