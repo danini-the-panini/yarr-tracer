@@ -1,15 +1,18 @@
 use std::sync::Arc;
 
-use crate::{material::Material, object::Hit, ray::Ray, texture::Texture};
+use crate::{
+    color::Color, material::Material, object::Hit, ray::Ray, solid_color::SolidColor,
+    texture::Texture,
+};
 
 pub struct DiffuseLight {
-    tex: Arc<dyn Texture>,
+    pub tex: Arc<dyn Texture>,
 }
 
 impl DiffuseLight {
-    pub fn new(tex: &Arc<dyn Texture>) -> Self {
+    pub fn solid(albedo: Color) -> Self {
         Self {
-            tex: Arc::clone(tex),
+            tex: Arc::new(SolidColor(albedo)),
         }
     }
 }

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use crate::background::{Background, BgExpr, Gradient};
 use crate::bvh::BVH;
 use crate::checker::Checker;
+use crate::diffuse_light::DiffuseLight;
 use crate::image::Image;
 use crate::material::Material;
 use crate::math::{Vec2, Vec3};
@@ -12,6 +13,7 @@ use crate::object::Object;
 use crate::perlin::Noise;
 use crate::quad::Quad;
 use crate::scene::Scene;
+use crate::shapes::make_box;
 use crate::solid_color::SolidColor;
 use crate::sphere::Sphere;
 use crate::texture::Texture;
@@ -153,6 +155,16 @@ impl KdlLoader {
         }
     }
 
+    fn parse_diffuse_light(&self, node: &KdlNode) -> DiffuseLight {
+        if node.children().unwrap().get("albedo").is_some() {
+            DiffuseLight::solid(get_vec(node, "albedo"))
+        } else {
+            DiffuseLight {
+                tex: self.get_tex(&node.children().unwrap().get("tex").unwrap()),
+            }
+        }
+    }
+
     fn parse_mat(&self, node: &KdlNode) -> Arc<dyn Material> {
         match node.get(0).unwrap().as_string().unwrap() {
             "Lambertian" => Arc::new(self.parse_lambert(node)),
@@ -160,13 +172,14 @@ impl KdlLoader {
             "Dielectric" => Arc::new(Dielectric {
                 refraction_index: get_float(node, "refraction_index"),
             }),
+            "DiffuseLight" => Arc::new(self.parse_diffuse_light(node)),
             _ => panic!("Unknown object type {}", node.name().value()),
         }
     }
 
     fn get_mat(&self, node: &KdlNode) -> Arc<dyn Material> {
         match node.get(0).unwrap().as_string().unwrap() {
-            "Lambertian" | "Metal" | "Dielectric" => self.parse_mat(node),
+            "Lambertian" | "Metal" | "Dielectric" | "DiffuseLight" => self.parse_mat(node),
             name => Arc::clone(self.materials.get(name).unwrap()),
         }
     }
@@ -194,6 +207,13 @@ impl KdlLoader {
         })
     }
 
+    fn parse_box(&self, node: &KdlNode) -> Box<dyn Object> {
+        let a = get_vec(node, "a");
+        let b = get_vec(node, "b");
+        let mat = self.get_mat(&node.children().unwrap().get("mat").unwrap());
+        Box::new(make_box(a, b, mat))
+    }
+
     fn parse_group(&self, kdl: &KdlDocument) -> Box<dyn Object> {
         let objects = kdl
             .nodes()
@@ -201,6 +221,7 @@ impl KdlLoader {
             .map(|node| match node.name().value() {
                 "Sphere" => self.parse_sphere(node),
                 "Quad" => self.parse_quad(node),
+                "Box" => self.parse_box(node),
                 _ => panic!("Unknown object type {}", node.name().value()),
             })
             .collect();

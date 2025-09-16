@@ -43,10 +43,11 @@ impl Scene {
         }
 
         if let Some(hit) = self.world.hit(r, &Interval::from(0.001)) {
+            let emitted = hit.mat.emitted(r, &hit);
             if let Some(scatter) = hit.mat.scatter(r, &hit) {
-                return scatter.att * self.ray_color(&scatter.ray, depth - 1);
+                return emitted + scatter.att * self.ray_color(&scatter.ray, depth - 1);
             } else {
-                return rgb!(0.0, 0.0, 0.0);
+                return emitted;
             }
         }
 

@@ -1,0 +1,47 @@
+Camera {
+	image_width 400
+	image_height 225
+	vfov 20.0
+	lookfrom 26.0 3.0 6.0
+	lookat 0.0 2.0 0.0
+	vup 0.0 1.0 0.0
+	defocus_angle 0.0
+	focus_dist 10.0
+	samples 100
+	max_depth 50
+}
+Textures {
+	marble Noise "0.5 * (1.0 + sin(4.0 * z + 10.0 * turb(p, 7)))"
+}
+Materials {
+	marble Lambertian {
+		tex marble
+	}
+	light DiffuseLight {
+		albedo 4.0 4.0 4.0
+	}
+}
+World {
+	Sphere {
+		center 0.0 -1000.0 0.0
+		radius 1000.0
+		mat marble
+	}
+	Sphere {
+		center 0.0 2.0 0.0
+		radius 2.0
+		mat marble
+	}
+	Sphere {
+		center 0.0 7.0 0.0
+		radius 2.0
+		mat light
+	}
+	Quad {
+		q 3.0 1.0 -2.0
+		u 2.0 0.0 0.0
+		v 0.0 2.0 0.0
+		mat light
+	}
+}
+Background Solid 0.0 0.0 0.0

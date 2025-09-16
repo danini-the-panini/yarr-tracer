@@ -27,6 +27,7 @@ mod perlin;
 mod quad;
 mod ray;
 mod scene;
+mod shapes;
 mod solid_color;
 mod sphere;
 mod test_data;
