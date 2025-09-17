@@ -1,0 +1,87 @@
+Camera {
+	image_width 512
+	image_height 512
+	vfov 40.0
+	lookfrom 278.0 278.0 -800.0
+	lookat 278.0 278.0 0.0
+	vup 0.0 1.0 0.0
+	defocus_angle 0.0
+	focus_dist 10.0
+	samples 200
+	max_depth 50
+}
+Materials {
+    red   Lambertian {
+    	albedo 0.65 0.05 0.05
+    }
+    white Lambertian {
+    	albedo 0.73 0.73 0.73
+    }
+    green Lambertian {
+    	albedo 0.12 0.45 0.15
+    }
+    light DiffuseLight {
+    	albedo 7.0 7.0 7.0
+    }
+}
+World {
+    Quad {
+    	q 555.0 0.0 0.0
+    	u 0.0 555.0 0.0
+    	v 0.0 0.0 555.0
+    	mat green
+    }
+    Quad {
+		q 0.0 0.0 0.0
+		u 0.0 555.0 0.0
+		v 0.0 0.0 555.0
+		mat red
+	}
+    Quad {
+		q 113.0 554.0 127.0
+		u 330.0 0.0 0.0
+		v 0.0 0.0 305.0
+		mat light
+	}
+    Quad {
+		q 0.0 0.0 0.0
+		u 555.0 0.0 0.0
+		v 0.0 0.0 555.0
+		mat white
+	}
+    Quad {
+		q 555.0 555.0 555.0
+		u -555.0 0.0 0.0
+		v 0.0 0.0 -555.0
+		mat white
+	}
+    Quad {
+		q 0.0 0.0 555.0
+		u 555.0 0.0 0.0
+		v 0.0 555.0 0.0
+		mat white
+	}
+	Translate {
+		offset 265.0 0.0 295.0
+		obj RotateY {
+			angle 15.0
+			obj  Box {
+				a 0.0 0.0 0.0
+				b 165.0 330.0 165.0
+				mat white
+			}
+		}
+	}
+	Translate {
+		offset 130.0 0.0 65.0
+		obj RotateY {
+			angle -18.0
+			obj  Box {
+				a 0.0 0.0 0.0
+				b 165.0 165.0 165.0
+				mat white
+			}
+		}
+	}
+}
+Background Solid 0.0 0.0 0.0

@@ -1,0 +1,31 @@
+Camera {
+	image_width 400
+	image_height 225
+	vfov 20.0
+	lookfrom 13.0 2.0 3.0
+	lookat 0.0 0.0 0.0
+	vup 0.0 1.0 0.0
+	defocus_angle 0.0
+	focus_dist 10.0
+	samples 100
+	max_depth 50
+}
+Textures {
+	checker Checker {
+		scale 0.32
+		even 0.2 0.3 0.1
+		odd 0.9 0.9 0.9
+	}
+}
+World {
+	Sphere {
+		center 0.0 -10.0 0.0
+		radius 10.0
+		mat Lambertian { tex checker }
+	}
+	Sphere {
+		center 0.0 10.0 0.0
+		radius 10.0
+		mat Lambertian { tex checker }
+	}
+}
