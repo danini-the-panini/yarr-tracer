@@ -7,6 +7,8 @@ edition = "2021"
 exmex = { version = "0.20.4", features = ["value"] }
 image = { version = "0.25.8", features = ["rayon"] }
 kdl = "6.3.4"
+miette = { version = "7.6.0", features = ["fancy"] }
 num_cpus = "1.17.0"
 rand = "0.9.2"
 smallvec = "1.15.1"
+thiserror = "2.0.16"

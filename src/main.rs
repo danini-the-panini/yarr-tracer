@@ -44,8 +44,7 @@ fn main() {
         return;
     }
 
-    let scene =
-        load_scene(args[1].clone()).unwrap_or_else(|err| panic!("Failed to load scene: {}", err.0));
+    let scene = load_scene(args[1].clone()).unwrap();
 
     let cpus = num_cpus::get();
 

@@ -1,12 +1,16 @@
 use std::collections::HashMap;
+use std::error::Error;
 use std::fs;
 use std::sync::Arc;
 
 use crate::background::{Background, BgExpr, Gradient};
 use crate::bvh::BVH;
+use crate::camera::Camera;
 use crate::checker::Checker;
+use crate::color::Color;
 use crate::constant_medium::ConstantMedium;
 use crate::diffuse_light::DiffuseLight;
+use crate::group::Group;
 use crate::image::Image;
 use crate::material::Material;
 use crate::math::{Vec2, Vec3};
@@ -19,86 +23,195 @@ use crate::solid_color::SolidColor;
 use crate::sphere::Sphere;
 use crate::texture::Texture;
 use crate::transform::{RotateY, Translate};
-use crate::vec3;
-use crate::{camera::Camera, error::Error};
-use kdl::{KdlDocument, KdlNode};
+use crate::{error, rgb, vec3};
+use kdl::{KdlDocument, KdlError, KdlNode};
+use miette::{Diagnostic, IntoDiagnostic, NamedSource, SourceSpan};
 
 use crate::{dielectric::Dielectric, lambertian::Lambertian, metal::Metal};
 
-fn get_vec(node: &KdlNode, key: &str) -> Vec3 {
+#[derive(thiserror::Error, Debug, Diagnostic)]
+#[error("{msg:?}")]
+#[diagnostic()]
+pub struct LoadError {
+    msg: String,
+    #[label]
+    span: Option<SourceSpan>,
+}
+
+impl LoadError {
+    fn new(msg: &str, node: &KdlNode) -> Self {
+        Self {
+            msg: msg.into(),
+            span: Some(node.span()),
+        }
+    }
+
+    fn obj(obj: &str, node: &KdlNode) -> Self {
+        Self {
+            msg: format!("Failed to load {}", obj),
+            span: Some(node.span()),
+        }
+    }
+
+    fn err<E>(obj: &str, err: E, node: &KdlNode) -> Self
+    where
+        E: Error,
+    {
+        Self {
+            msg: format!("Failed to load {}, {}", obj, err.to_string()),
+            span: Some(node.span()),
+        }
+    }
+}
+
+impl From<KdlError> for LoadError {
+    fn from(value: KdlError) -> Self {
+        Self {
+            msg: format!("Failed to load Scene: {}", value.to_string()),
+            span: Some(value.diagnostics.first().unwrap().span),
+        }
+    }
+}
+
+impl From<std::io::Error> for LoadError {
+    fn from(value: std::io::Error) -> Self {
+        Self {
+            msg: value.to_string(),
+            span: None,
+        }
+    }
+}
+
+impl From<error::Error> for LoadError {
+    fn from(value: error::Error) -> Self {
+        Self {
+            msg: value.to_string(),
+            span: None,
+        }
+    }
+}
+
+type LoadResult<T = ()> = Result<T, LoadError>;
+
+fn get_vec(node: &KdlNode, key: &str) -> LoadResult<Vec3> {
     get_vec_at(&node.children().unwrap().get(key).unwrap(), 0)
 }
 
-fn get_vec_at(node: &KdlNode, i: usize) -> Vec3 {
-    vec3!(
-        node.get(i).unwrap().as_float().unwrap(),
-        node.get(i + 1).unwrap().as_float().unwrap(),
-        node.get(i + 2).unwrap().as_float().unwrap()
-    )
+fn get_vec_at(node: &KdlNode, i: usize) -> LoadResult<Vec3> {
+    match (
+        node.get(i).and_then(|x| x.as_float()),
+        node.get(i + 1).and_then(|y| y.as_float()),
+        node.get(i + 2).and_then(|z| z.as_float()),
+    ) {
+        (Some(x), Some(y), Some(z)) => Ok(vec3!(x, y, z)),
+        _ => Err(LoadError::obj("Vec3", node)),
+    }
 }
 
-fn get_vec2(node: &KdlNode, key: &str) -> Vec2 {
+fn get_vec2(node: &KdlNode, key: &str) -> LoadResult<Vec2> {
     get_vec2_at(&node.children().unwrap().get(key).unwrap(), 0)
 }
 
-fn get_vec2_at(node: &KdlNode, i: usize) -> Vec2 {
-    Vec2::new(
-        node.get(i).unwrap().as_float().unwrap(),
-        node.get(i + 1).unwrap().as_float().unwrap(),
-    )
+fn get_vec2_at(node: &KdlNode, i: usize) -> LoadResult<Vec2> {
+    match (
+        node.get(i).and_then(|x| x.as_float()),
+        node.get(i + 1).and_then(|y| y.as_float()),
+    ) {
+        (Some(x), Some(y)) => Ok(Vec2::new(x, y)),
+        _ => Err(LoadError::obj("Vec2", node)),
+    }
 }
 
-fn get_float(node: &KdlNode, key: &str) -> f64 {
+fn get_float(node: &KdlNode, key: &str) -> LoadResult<f64> {
     node.children()
-        .unwrap()
-        .get_arg(key)
-        .unwrap()
-        .as_float()
-        .unwrap()
-}
-fn get_int(node: &KdlNode, key: &str) -> i128 {
-    node.children()
-        .unwrap()
-        .get_arg(key)
-        .unwrap()
-        .as_integer()
-        .unwrap()
+        .and_then(|c| c.get_arg(key))
+        .and_then(|a| a.as_float())
+        .ok_or_else(|| LoadError::obj("Float", node))
 }
 
-fn parse_checker_tex(node: &KdlNode, key: &str) -> Arc<dyn Texture> {
-    let tnode = node.children().unwrap().get(key).unwrap();
-    if tnode.get(0).unwrap().is_string() {
-        parse_tex(&tnode)
+fn get_int(node: &KdlNode, key: &str) -> LoadResult<i128> {
+    node.children()
+        .and_then(|c| c.get_arg(key))
+        .and_then(|a| a.as_integer())
+        .ok_or_else(|| LoadError::obj("Integer", node))
+}
+
+fn parse_checker_tex(node: &KdlNode, key: &str) -> LoadResult<Arc<dyn Texture>> {
+    match node.children().and_then(|c| c.get(key)) {
+        Some(tnode) => {
+            if tnode.get(0).is_some_and(|n| n.is_string()) {
+                parse_tex(&tnode)
+            } else {
+                Ok(Arc::new(SolidColor(get_vec(node, key)?)))
+            }
+        }
+        None => Err(LoadError::obj("Checker", node)),
+    }
+}
+
+fn parse_checker(node: &KdlNode) -> LoadResult<Checker> {
+    Ok(Checker::new(
+        get_float(node, "scale")?,
+        &parse_checker_tex(node, "even")?,
+        &parse_checker_tex(node, "odd")?,
+    ))
+}
+
+fn parse_solid(node: &KdlNode) -> LoadResult<SolidColor> {
+    match (
+        node.get(1).and_then(|r| r.as_float()),
+        node.get(2).and_then(|g| g.as_float()),
+        node.get(3).and_then(|b| b.as_float()),
+    ) {
+        (Some(r), Some(g), Some(b)) => Ok(SolidColor(rgb!(r, g, b))),
+        _ => Err(LoadError::obj("Solid", node)),
+    }
+}
+
+fn parse_image(node: &KdlNode) -> LoadResult<Image> {
+    if let Some(path) = node.get(1).and_then(|a| a.as_string()) {
+        Image::load(path).or_else(|err| Err(LoadError::err("Image", err, node)))
     } else {
-        Arc::new(SolidColor(get_vec(node, key)))
+        Err(LoadError::obj("Image", node))
     }
 }
 
-fn parse_checker(node: &KdlNode) -> Checker {
-    let scale = get_float(node, "scale");
-    Checker::new(
-        scale,
-        &parse_checker_tex(node, "even"),
-        &parse_checker_tex(node, "odd"),
-    )
-}
-
-fn parse_tex(node: &KdlNode) -> Arc<dyn Texture> {
-    match node.get(0).unwrap().as_string().unwrap() {
-        "Solid" => Arc::new(SolidColor(vec3!(
-            node.get(1).unwrap().as_float().unwrap(),
-            node.get(2).unwrap().as_float().unwrap(),
-            node.get(3).unwrap().as_float().unwrap()
-        ))),
-        "Checker" => Arc::new(parse_checker(node)),
-        "Image" => Arc::new(Image::load(node.get(1).unwrap().as_string().unwrap()).unwrap()),
-        "Noise" => Arc::new(Noise::parse(node.get(1).unwrap().as_string().unwrap()).unwrap()),
-        _ => panic!("Unknown texture type {}", node.name().value()),
+fn parse_noise(node: &KdlNode) -> LoadResult<Noise> {
+    if let Some(expr) = node.get(1).and_then(|a| a.as_string()) {
+        Noise::parse(expr).or_else(|err| {
+            Err(LoadError::new(
+                format!("Failed to load Noise: {}", err.to_string()).as_str(),
+                node,
+            ))
+        })
+    } else {
+        Err(LoadError::obj("Noise", node))
     }
 }
 
-fn parse_gradient(node: &KdlNode) -> Gradient {
-    Gradient::new(get_vec(node, "top"), get_vec(node, "bottom"))
+fn parse_tex(node: &KdlNode) -> LoadResult<Arc<dyn Texture>> {
+    match node.get(0).and_then(|a| a.as_string()) {
+        Some("Solid") => Ok(Arc::new(parse_solid(node)?)),
+        Some("Checker") => Ok(Arc::new(parse_checker(node)?)),
+        Some("Image") => Ok(Arc::new(parse_image(node)?)),
+        Some("Noise") => Ok(Arc::new(parse_noise(node)?)),
+        _ => Err(LoadError::obj("Texture", node)),
+    }
+}
+
+fn parse_gradient(node: &KdlNode) -> LoadResult<Gradient> {
+    Ok(Gradient::new(
+        get_vec(node, "top")?,
+        get_vec(node, "bottom")?,
+    ))
+}
+
+fn parse_bg_expr(node: &KdlNode) -> LoadResult<BgExpr> {
+    if let Some(expr) = node.get(1).and_then(|a| a.as_string()) {
+        Ok(BgExpr::new(expr.replace("\n", " "))?)
+    } else {
+        Err(LoadError::obj("BgExpr", node))
+    }
 }
 
 #[derive(Default)]
@@ -109,141 +222,220 @@ struct KdlLoader {
 }
 
 impl KdlLoader {
-    fn load(path: String) -> Result<Scene, Error> {
+    fn load(path: String) -> miette::Result<Scene> {
+        let source = fs::read_to_string(&path).into_diagnostic()?;
+        let doc = KdlDocument::parse_v2(&source)?;
+
+        let (camera, world, background) = Self::load_scene_parts(doc)
+            .map_err(|err| err.with_source_code(NamedSource::new(path, source)))?;
+
+        Scene::new(camera, world, background).into_diagnostic()
+    }
+
+    fn load_scene_parts(
+        doc: KdlDocument,
+    ) -> miette::Result<(Camera, Box<dyn Object>, Option<Box<dyn Background>>)> {
         let mut loader = KdlLoader {
-            doc: KdlDocument::parse_v2(&fs::read_to_string(path)?)?,
+            doc,
             ..Default::default()
         };
 
-        loader.load_textures();
-        loader.load_materials();
-        let world = loader.parse_world();
-        let camera = loader.parse_camera();
-        let background = loader.parse_background();
+        loader.load_textures()?;
+        loader.load_materials()?;
+        let world = loader.parse_world()?;
+        let camera = loader.parse_camera()?;
+        let background = loader.parse_background()?;
 
-        Scene::new(camera, world, background)
+        Ok((camera, world, background))
     }
 
-    fn parse_world(&self) -> Box<dyn Object> {
-        self.parse_group(self.doc.get("World").unwrap().children().unwrap())
-    }
-
-    fn get_tex(&self, node: &KdlNode) -> Arc<dyn Texture> {
-        match node.get(0).unwrap().as_string().unwrap() {
-            "Solid" | "Image" | "Noise" => parse_tex(node),
-            name => Arc::clone(self.textures.get(name).unwrap()),
+    fn parse_world(&self) -> LoadResult<Box<dyn Object>> {
+        if let Some(nodes) = self.doc.get("World").and_then(|n| n.children()) {
+            self.parse_group(nodes)
+        } else {
+            Ok(Box::new(Group::default()))
         }
     }
 
-    fn parse_lambert(&self, node: &KdlNode) -> Lambertian {
-        if node.children().unwrap().get("albedo").is_some() {
-            Lambertian::solid(get_vec(node, "albedo"))
-        } else {
-            Lambertian {
-                tex: self.get_tex(&node.children().unwrap().get("tex").unwrap()),
-            }
+    fn get_tex(&self, node: &KdlNode) -> LoadResult<Arc<dyn Texture>> {
+        match node.get(0).and_then(|a| a.as_string()) {
+            Some("Solid" | "Image" | "Checker" | "Noise") => parse_tex(node),
+            Some(name) => self
+                .textures
+                .get(name)
+                .map(|tex| Arc::clone(tex))
+                .ok_or_else(|| LoadError::new(format!("No such texture {}", name).as_str(), node)),
+            None => Err(LoadError::obj("Texture", node)),
         }
     }
 
-    fn parse_metal(&self, node: &KdlNode) -> Metal {
-        let fuzz = get_float(node, "fuzz");
-        if node.children().unwrap().get("albedo").is_some() {
-            Metal::solid(get_vec(node, "albedo"), fuzz)
+    fn parse_lambert(&self, node: &KdlNode) -> LoadResult<Lambertian> {
+        if node.children().is_some_and(|c| c.get("albedo").is_some()) {
+            Ok(Lambertian::solid(get_vec(node, "albedo")?))
+        } else if let Some(tex) = node.children().and_then(|c| c.get("tex")) {
+            Ok(Lambertian {
+                tex: self.get_tex(&tex)?,
+            })
         } else {
-            Metal {
-                tex: self.get_tex(&node.children().unwrap().get("tex").unwrap()),
+            Err(LoadError::obj("Lambertian", node))
+        }
+    }
+
+    fn parse_metal(&self, node: &KdlNode) -> LoadResult<Metal> {
+        let fuzz = get_float(node, "fuzz")?;
+        if node.children().is_some_and(|c| c.get("albedo").is_some()) {
+            Ok(Metal::solid(get_vec(node, "albedo")?, fuzz))
+        } else if let Some(tex) = node.children().and_then(|c| c.get("tex")) {
+            Ok(Metal {
+                tex: self.get_tex(&tex)?,
                 fuzz,
+            })
+        } else {
+            Err(LoadError::obj("Metal", node))
+        }
+    }
+
+    fn parse_diffuse_light(&self, node: &KdlNode) -> LoadResult<DiffuseLight> {
+        if node.children().is_some_and(|c| c.get("albedo").is_some()) {
+            Ok(DiffuseLight::solid(get_vec(node, "albedo")?))
+        } else if let Some(tex) = node.children().and_then(|c| c.get("tex")) {
+            Ok(DiffuseLight {
+                tex: self.get_tex(&tex)?,
+            })
+        } else {
+            Err(LoadError::obj("DiffuseLight", node))
+        }
+    }
+
+    fn parse_mat(&self, node: &KdlNode) -> LoadResult<Arc<dyn Material>> {
+        match node.get(0).and_then(|a| a.as_string()) {
+            Some("Lambertian") => Ok(Arc::new(self.parse_lambert(node)?)),
+            Some("Metal") => Ok(Arc::new(self.parse_metal(node)?)),
+            Some("Dielectric") => Ok(Arc::new(Dielectric {
+                refraction_index: get_float(node, "refraction_index")?,
+            })),
+            Some("DiffuseLight") => Ok(Arc::new(self.parse_diffuse_light(node)?)),
+            Some(name) => Err(LoadError::new(
+                format!("Unknown Material {}", name).as_str(),
+                node,
+            )),
+            _ => Err(LoadError::obj("Materal", node)),
+        }
+    }
+
+    fn get_mat(&self, node: &KdlNode) -> LoadResult<Arc<dyn Material>> {
+        match node.get(0).and_then(|a| a.as_string()) {
+            Some("Lambertian" | "Metal" | "Dielectric" | "DiffuseLight") => self.parse_mat(node),
+            Some(name) => self
+                .materials
+                .get(name)
+                .map(|mat| Arc::clone(mat))
+                .ok_or_else(|| LoadError::new(format!("No such material {}", name).as_str(), node)),
+            _ => Err(LoadError::obj("Material", node)),
+        }
+    }
+
+    fn parse_quad(&self, node: &KdlNode) -> LoadResult<Box<dyn Object>> {
+        let q = get_vec(node, "q")?;
+        let u = get_vec(node, "u")?;
+        let v = get_vec(node, "v")?;
+        if let Some(n) = node.children().and_then(|c| c.get("mat")) {
+            let mat = self.get_mat(&n)?;
+            Ok(Box::new(Quad::new(q, u, v, &mat)))
+        } else {
+            Err(LoadError::obj("Quad", node))
+        }
+    }
+
+    fn parse_sphere(&self, node: &KdlNode) -> LoadResult<Box<dyn Object>> {
+        let radius = get_float(node, "radius")?;
+        if let Some(n) = node.children().and_then(|c| c.get("mat")) {
+            let mat = self.get_mat(&n)?;
+            Ok(Box::new(
+                if node
+                    .children()
+                    .is_some_and(|c| c.get_arg("center").is_some())
+                {
+                    Sphere::stationary(get_vec(node, "center")?, radius, &mat)
+                } else {
+                    Sphere::moving(
+                        get_vec(node, "center1")?,
+                        get_vec(node, "center2")?,
+                        radius,
+                        &mat,
+                    )
+                },
+            ))
+        } else {
+            Err(LoadError::obj("Sphere", node))
+        }
+    }
+
+    fn parse_box(&self, node: &KdlNode) -> LoadResult<Box<dyn Object>> {
+        let a = get_vec(node, "a")?;
+        let b = get_vec(node, "b")?;
+        if let Some(n) = node.children().and_then(|c| c.get("mat")) {
+            let mat = self.get_mat(&n)?;
+            Ok(Box::new(make_box(a, b, mat)))
+        } else {
+            Err(LoadError::obj("Box", node))
+        }
+    }
+
+    fn parse_translate(&self, node: &KdlNode) -> LoadResult<Box<dyn Object>> {
+        let offset = get_vec(node, "offset")?;
+        if let Some((ty, obj)) = node
+            .children()
+            .and_then(|c| c.get("obj"))
+            .and_then(|obj| obj.get(0).and_then(|a| a.as_string().map(|ty| (ty, obj))))
+        {
+            let obj = self.parse_object(ty, obj)?;
+            Ok(Box::new(Translate::new(obj, offset)))
+        } else {
+            Err(LoadError::obj("Translate", node))
+        }
+    }
+
+    fn parse_rotate_y(&self, node: &KdlNode) -> LoadResult<Box<dyn Object>> {
+        let angle = get_float(node, "angle")?;
+        if let Some((ty, obj)) = node
+            .children()
+            .and_then(|c| c.get("obj"))
+            .and_then(|obj| obj.get(0).and_then(|a| a.as_string().map(|ty| (ty, obj))))
+        {
+            let obj = self.parse_object(ty, obj)?;
+            Ok(Box::new(RotateY::new(obj, angle)))
+        } else {
+            Err(LoadError::obj("Translate", node))
+        }
+    }
+
+    fn parse_constant_medium(&self, node: &KdlNode) -> LoadResult<Box<dyn Object>> {
+        let density = get_float(node, "density")?;
+        let children = node.children();
+        if let Some((ty, obj)) = children
+            .and_then(|c| c.get("obj"))
+            .and_then(|obj| obj.get(0).and_then(|a| a.as_string().map(|ty| (ty, obj))))
+        {
+            let boundary = self.parse_object(ty, obj)?;
+            if children.is_some_and(|c| c.get("color").is_some()) {
+                Ok(Box::new(ConstantMedium::solid(
+                    boundary,
+                    density,
+                    get_vec(node, "color")?,
+                )))
+            } else if let Some(tex) = children.and_then(|c| c.get("tex")) {
+                let tex = self.get_tex(tex)?;
+                Ok(Box::new(ConstantMedium::new(boundary, density, tex)))
+            } else {
+                Err(LoadError::obj("ConstantMedium", node))
             }
-        }
-    }
-
-    fn parse_diffuse_light(&self, node: &KdlNode) -> DiffuseLight {
-        if node.children().unwrap().get("albedo").is_some() {
-            DiffuseLight::solid(get_vec(node, "albedo"))
         } else {
-            DiffuseLight {
-                tex: self.get_tex(&node.children().unwrap().get("tex").unwrap()),
-            }
+            Err(LoadError::obj("ConstantMedium", node))
         }
     }
 
-    fn parse_mat(&self, node: &KdlNode) -> Arc<dyn Material> {
-        match node.get(0).unwrap().as_string().unwrap() {
-            "Lambertian" => Arc::new(self.parse_lambert(node)),
-            "Metal" => Arc::new(self.parse_metal(node)),
-            "Dielectric" => Arc::new(Dielectric {
-                refraction_index: get_float(node, "refraction_index"),
-            }),
-            "DiffuseLight" => Arc::new(self.parse_diffuse_light(node)),
-            _ => panic!("Unknown object type {}", node.name().value()),
-        }
-    }
-
-    fn get_mat(&self, node: &KdlNode) -> Arc<dyn Material> {
-        match node.get(0).unwrap().as_string().unwrap() {
-            "Lambertian" | "Metal" | "Dielectric" | "DiffuseLight" => self.parse_mat(node),
-            name => Arc::clone(self.materials.get(name).unwrap()),
-        }
-    }
-
-    fn parse_quad(&self, node: &KdlNode) -> Box<dyn Object> {
-        let q = get_vec(node, "q");
-        let u = get_vec(node, "u");
-        let v = get_vec(node, "v");
-        let mat = self.get_mat(&node.children().unwrap().get("mat").unwrap());
-        Box::new(Quad::new(q, u, v, &mat))
-    }
-
-    fn parse_sphere(&self, node: &KdlNode) -> Box<dyn Object> {
-        let radius = get_float(node, "radius");
-        let mat = self.get_mat(&node.children().unwrap().get("mat").unwrap());
-        Box::new(if node.children().unwrap().get_arg("center").is_some() {
-            Sphere::stationary(get_vec(node, "center"), radius, &mat)
-        } else {
-            Sphere::moving(
-                get_vec(node, "center1"),
-                get_vec(node, "center2"),
-                radius,
-                &mat,
-            )
-        })
-    }
-
-    fn parse_box(&self, node: &KdlNode) -> Box<dyn Object> {
-        let a = get_vec(node, "a");
-        let b = get_vec(node, "b");
-        let mat = self.get_mat(&node.children().unwrap().get("mat").unwrap());
-        Box::new(make_box(a, b, mat))
-    }
-
-    fn parse_translate(&self, node: &KdlNode) -> Box<dyn Object> {
-        let obj = node.children().unwrap().get("obj").unwrap();
-        let obj = self.parse_object(obj.get(0).unwrap().as_string().unwrap(), &obj);
-        let offset = get_vec(node, "offset");
-        Box::new(Translate::new(obj, offset))
-    }
-
-    fn parse_rotate_y(&self, node: &KdlNode) -> Box<dyn Object> {
-        let obj = node.children().unwrap().get("obj").unwrap();
-        let obj = self.parse_object(obj.get(0).unwrap().as_string().unwrap(), &obj);
-        let angle = get_float(node, "angle");
-        Box::new(RotateY::new(obj, angle))
-    }
-
-    fn parse_constant_medium(&self, node: &KdlNode) -> Box<dyn Object> {
-        let children = node.children().unwrap();
-        let boundary = children.get("boundary").unwrap();
-        let boundary = self.parse_object(boundary.get(0).unwrap().as_string().unwrap(), &boundary);
-        let density = get_float(node, "density");
-        Box::new(if children.get("color").is_some() {
-            ConstantMedium::solid(boundary, density, get_vec(node, "color"))
-        } else {
-            let tex = self.get_tex(&children.get("tex").unwrap());
-            ConstantMedium::new(boundary, density, tex)
-        })
-    }
-
-    fn parse_object(&self, name: &str, node: &KdlNode) -> Box<dyn Object> {
+    fn parse_object(&self, name: &str, node: &KdlNode) -> LoadResult<Box<dyn Object>> {
         match name {
             "Sphere" => self.parse_sphere(node),
             "Quad" => self.parse_quad(node),
@@ -251,86 +443,103 @@ impl KdlLoader {
             "Translate" => self.parse_translate(node),
             "RotateY" => self.parse_rotate_y(node),
             "ConstantMedium" => self.parse_constant_medium(node),
-            _ => panic!("Unknown object type {}", node.name().value()),
+            _ => Err(LoadError::new(
+                format!("Unknown object type {}", node.name().value()).as_str(),
+                node,
+            )),
         }
     }
 
-    fn parse_group(&self, kdl: &KdlDocument) -> Box<dyn Object> {
+    fn parse_group(&self, kdl: &KdlDocument) -> LoadResult<Box<dyn Object>> {
         let objects = kdl
             .nodes()
             .iter()
             .map(|node| self.parse_object(node.name().value(), node))
-            .collect();
-        BVH::new(objects)
+            .collect::<LoadResult<Vec<Box<dyn Object>>>>()?;
+        Ok(BVH::new(objects))
     }
 
-    fn parse_camera(&self) -> Camera {
+    fn parse_camera(&self) -> LoadResult<Camera> {
         let camera = self.doc.get("Camera").unwrap();
-        Camera::new(
-            get_int(&camera, "image_width") as usize,
-            get_int(&camera, "image_height") as usize,
-            get_float(&camera, "vfov"),
-            get_vec(&camera, "lookfrom"),
-            get_vec(&camera, "lookat"),
-            get_vec(&camera, "vup"),
-            get_float(&camera, "defocus_angle"),
-            get_float(&camera, "focus_dist"),
-            get_int(&camera, "samples") as u32,
-            get_int(&camera, "max_depth") as u32,
-        )
+        Ok(Camera::new(
+            get_int(&camera, "image_width")? as usize,
+            get_int(&camera, "image_height")? as usize,
+            get_float(&camera, "vfov")?,
+            get_vec(&camera, "lookfrom")?,
+            get_vec(&camera, "lookat")?,
+            get_vec(&camera, "vup")?,
+            get_float(&camera, "defocus_angle")?,
+            get_float(&camera, "focus_dist")?,
+            get_int(&camera, "samples")? as u32,
+            get_int(&camera, "max_depth")? as u32,
+        ))
     }
 
-    fn parse_background(&self) -> Option<Box<dyn Background>> {
+    fn parse_background(&self) -> LoadResult<Option<Box<dyn Background>>> {
         if let Some(node) = self.doc.get("Background") {
-            let ty = node.get(0).unwrap().as_string().unwrap();
-            Some(match ty {
-                "Solid" => Box::new(SolidColor(get_vec_at(&node, 1))),
-                "Gradient" => Box::new(parse_gradient(&node)),
+            match node.get(0).and_then(|a| a.as_string()) {
+                Some("Solid") => Ok(Some(Box::new(SolidColor(get_vec_at(&node, 1)?)))),
+                Some("Gradient") => Ok(Some(Box::new(parse_gradient(&node)?))),
                 // "ClearSky" => Box::new(ClearSky::new(
                 //     get_vec2(&node, "sun"),
                 //     get_float(&node, "scale"),
                 //     get_vec(&node, "sun_color"),
                 //     parse_gradient(node.children().unwrap().get("bg").unwrap()),
                 // )),
-                "Image" => {
-                    Box::new(Image::load(node.get(1).unwrap().as_string().unwrap()).unwrap())
+                Some("Image") => {
+                    parse_image(&node).map(|x| Some(Box::new(x) as Box<dyn Background>))
                 }
-                "Expression" => Box::new(
-                    BgExpr::new(node.get(1).unwrap().as_string().unwrap().replace("\n", " "))
-                        .unwrap(),
-                ),
-                _ => panic!("unknown background type {}", ty),
-            })
+                Some("Expression") => {
+                    parse_bg_expr(&node).map(|x| Some(Box::new(x) as Box<dyn Background>))
+                }
+                Some(ty) => Err(LoadError::new(
+                    format!("unknown background type {}", ty).as_str(),
+                    node,
+                )),
+                None => Err(LoadError::obj("Background", node)),
+            }
         } else {
-            None
+            Ok(None)
         }
     }
 
-    fn load_textures(&mut self) {
-        if let Some(node) = self.doc.get("Textures") {
-            self.textures = node
-                .children()
-                .unwrap()
-                .nodes()
+    fn load_textures(&mut self) -> LoadResult {
+        if let Some(nodes) = self
+            .doc
+            .get("Textures")
+            .and_then(|t| t.children())
+            .map(|c| c.nodes())
+        {
+            self.textures = nodes
                 .iter()
-                .map(|tnode| (tnode.name().value().to_string(), parse_tex(tnode)))
-                .collect();
+                .map(|tnode| {
+                    let name = tnode.name().value().to_string();
+                    parse_tex(tnode).map(|tex| (name, tex))
+                })
+                .collect::<LoadResult<HashMap<String, Arc<dyn Texture>>>>()?;
         }
+        Ok(())
     }
 
-    fn load_materials(&mut self) {
-        if let Some(node) = self.doc.get("Materials") {
-            self.materials = node
-                .children()
-                .unwrap()
-                .nodes()
+    fn load_materials(&mut self) -> LoadResult {
+        if let Some(nodes) = self
+            .doc
+            .get("Materials")
+            .and_then(|t| t.children())
+            .map(|c| c.nodes())
+        {
+            self.materials = nodes
                 .iter()
-                .map(|tnode| (tnode.name().value().to_string(), self.parse_mat(tnode)))
-                .collect();
+                .map(|mnode| {
+                    let name = mnode.name().value().to_string();
+                    self.parse_mat(mnode).map(|mat| (name, mat))
+                })
+                .collect::<LoadResult<HashMap<String, Arc<dyn Material>>>>()?;
         }
+        Ok(())
     }
 }
 
-pub fn load_scene(path: String) -> Result<Scene, Error> {
+pub fn load_scene(path: String) -> miette::Result<Scene> {
     KdlLoader::load(path)
 }
