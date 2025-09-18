@@ -251,7 +251,7 @@ impl KdlLoader {
 
     fn parse_world(&self) -> LoadResult<Box<dyn Object>> {
         if let Some(nodes) = self.doc.get("World").and_then(|n| n.children()) {
-            self.parse_group(nodes)
+            Ok(BVH::new(self.parse_objects(nodes)?))
         } else {
             Ok(Box::new(Group::default()))
         }
@@ -414,7 +414,7 @@ impl KdlLoader {
         let density = get_float(node, "density")?;
         let children = node.children();
         if let Some((ty, obj)) = children
-            .and_then(|c| c.get("obj"))
+            .and_then(|c| c.get("boundary"))
             .and_then(|obj| obj.get(0).and_then(|a| a.as_string().map(|ty| (ty, obj))))
         {
             let boundary = self.parse_object(ty, obj)?;
@@ -437,6 +437,8 @@ impl KdlLoader {
 
     fn parse_object(&self, name: &str, node: &KdlNode) -> LoadResult<Box<dyn Object>> {
         match name {
+            "Group" => self.parse_group(node),
+            "BVH" => self.parse_bvh(node),
             "Sphere" => self.parse_sphere(node),
             "Quad" => self.parse_quad(node),
             "Box" => self.parse_box(node),
@@ -450,29 +452,49 @@ impl KdlLoader {
         }
     }
 
-    fn parse_group(&self, kdl: &KdlDocument) -> LoadResult<Box<dyn Object>> {
-        let objects = kdl
-            .nodes()
+    fn parse_group(&self, node: &KdlNode) -> LoadResult<Box<dyn Object>> {
+        if let Some(children) = node.children() {
+            Ok(Box::new(Group::new(self.parse_objects(children)?)))
+        } else {
+            Ok(Box::new(Group::default()))
+        }
+    }
+
+    fn parse_bvh(&self, node: &KdlNode) -> LoadResult<Box<dyn Object>> {
+        if let Some(children) = node.children() {
+            Ok(BVH::new(self.parse_objects(children)?))
+        } else {
+            Ok(Box::new(Group::default()))
+        }
+    }
+
+    fn parse_objects(&self, kdl: &KdlDocument) -> LoadResult<Vec<Box<dyn Object>>> {
+        kdl.nodes()
             .iter()
             .map(|node| self.parse_object(node.name().value(), node))
-            .collect::<LoadResult<Vec<Box<dyn Object>>>>()?;
-        Ok(BVH::new(objects))
+            .collect()
     }
 
     fn parse_camera(&self) -> LoadResult<Camera> {
-        let camera = self.doc.get("Camera").unwrap();
-        Ok(Camera::new(
-            get_int(&camera, "image_width")? as usize,
-            get_int(&camera, "image_height")? as usize,
-            get_float(&camera, "vfov")?,
-            get_vec(&camera, "lookfrom")?,
-            get_vec(&camera, "lookat")?,
-            get_vec(&camera, "vup")?,
-            get_float(&camera, "defocus_angle")?,
-            get_float(&camera, "focus_dist")?,
-            get_int(&camera, "samples")? as u32,
-            get_int(&camera, "max_depth")? as u32,
-        ))
+        if let Some(camera) = self.doc.get("Camera") {
+            Ok(Camera::new(
+                get_int(&camera, "image_width")? as usize,
+                get_int(&camera, "image_height")? as usize,
+                get_float(&camera, "vfov")?,
+                get_vec(&camera, "lookfrom")?,
+                get_vec(&camera, "lookat")?,
+                get_vec(&camera, "vup")?,
+                get_float(&camera, "defocus_angle")?,
+                get_float(&camera, "focus_dist")?,
+                get_int(&camera, "samples")? as u32,
+                get_int(&camera, "max_depth")? as u32,
+            ))
+        } else {
+            Err(LoadError {
+                msg: "Failed to load Camera".into(),
+                span: None,
+            })
+        }
     }
 
     fn parse_background(&self) -> LoadResult<Option<Box<dyn Background>>> {
